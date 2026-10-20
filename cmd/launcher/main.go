@@ -20,6 +20,13 @@ import (
 )
 
 func main() {
+	// A console-subsystem build (plain `go build ./cmd/launcher`) would keep a
+	// black window alive for the whole life of the launcher. Detach before
+	// anything else; -dump needs the console and is exempt.
+	if !wantsDump(os.Args[1:]) {
+		win.FreeConsole()
+	}
+
 	dump := flag.Bool("dump", false, "print the discovered applications and exit")
 	demo := flag.String("demo", "", "open the launcher with this query and exit after -seconds")
 	seconds := flag.Int("seconds", 0, "with -demo: how long to stay on screen")
@@ -88,6 +95,7 @@ func run(cfg core.Config, demo string, seconds int) {
 	}
 
 	app := ui.New(shell, cfg, index.Load, history, launchFn)
+	defer app.Close()
 	app.Attach()
 	app.SetSize(shell.ClientSize())
 	app.SetRebuildHandler(func() { scanner.rebuild() })
@@ -302,4 +310,15 @@ func runDump(cfg core.Config) {
 func fatal(err error) {
 	fmt.Fprintln(os.Stderr, "launcher:", err)
 	os.Exit(1)
+}
+
+// wantsDump reports whether -dump is present, before flag.Parse runs.
+func wantsDump(args []string) bool {
+	for _, a := range args {
+		switch a {
+		case "-dump", "--dump", "-dump=true", "--dump=true":
+			return true
+		}
+	}
+	return false
 }

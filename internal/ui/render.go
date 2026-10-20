@@ -101,7 +101,6 @@ func (a *App) paintQuery(c *win.Canvas, l layout) {
 
 func (a *App) paintResults(c *win.Canvas, l layout) {
 	c.UseFont(a.fonts.Row)
-	lineH := c.LineHeight()
 
 	// Keep the selection visible if there are more results than rows.
 	offset := int32(0)
@@ -120,7 +119,7 @@ func (a *App) paintResults(c *win.Canvas, l layout) {
 			c.Fill(win.Rect{Left: 0, Top: y, Right: a.width, Bottom: y + l.rowH}, colorSelection)
 			c.Fill(win.Rect{Left: 0, Top: y, Right: a.scale(3), Bottom: y + l.rowH}, colorAccent)
 		}
-		a.paintRow(c, a.results[idx], y+(l.rowH-lineH)/2, l.pad)
+		a.paintRow(c, a.results[idx], y, l)
 	}
 
 	if len(a.results) == 0 && len(a.query) > 0 {
@@ -128,10 +127,21 @@ func (a *App) paintResults(c *win.Canvas, l layout) {
 	}
 }
 
-func (a *App) paintRow(c *win.Canvas, r core.Result, y, x int32) {
+// paintRow draws one result: icon, then the name with the matched runes in the
+// accent color. y is the top of the row, not of the text.
+func (a *App) paintRow(c *win.Canvas, r core.Result, y int32, l layout) {
+	iconSize := a.scale(20)
+	iconGap := a.scale(12)
+
+	icon := a.icons.get(r.Entry.IconPath)
+	icon.Draw(c, l.pad, y+(l.rowH-iconSize)/2, iconSize)
+
+	x := l.pad + iconSize + iconGap
+	textY := y + (l.rowH-c.LineHeight())/2
+
 	name := []rune(r.Entry.Name)
 	if len(r.Positions) == 0 {
-		c.Text(string(name), x, y, colorText)
+		c.Text(string(name), x, textY, colorText)
 		return
 	}
 
@@ -155,7 +165,7 @@ func (a *App) paintRow(c *win.Canvas, r core.Result, y, x int32) {
 		if on {
 			color = colorAccent
 		}
-		c.Text(segment, x, y, color)
+		c.Text(segment, x, textY, color)
 		x += c.Measure(segment)
 		i = j
 	}

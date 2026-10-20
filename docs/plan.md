@@ -39,7 +39,7 @@ non-Windows platforms.
 
 | Metric | Budget | Measured |
 |---|---|---|
-| Idle working set, full launcher with 96 apps | ≤ 30 MB | **21.9 MB** hidden · **24.3 MB** visible |
+| Idle working set, full launcher with 96 apps | ≤ 30 MB | **24.5 MB** hidden · **27.5 MB** with icons on screen |
 | Idle working set, bare shell (P0 spike) | — | **7.7 MB** before first show · **10.8 MB** after two show/hide cycles |
 | Private bytes (spike) | ≤ 30 MB | **12.6 MB** |
 | Boot: `main` → hotkey registered | ≤ 120 ms | **2.6 ms** |
@@ -48,9 +48,10 @@ non-Windows platforms.
 | Full scan of every source | ≤ 300 ms | **74 ms** for 96 apps (163 ms with a cold file cache) |
 | Search over 3 000 entries | ≤ 1 ms | **0.11 ms**, 2 KB allocated per query |
 | CPU, whole 6 s spike run incl. startup and 2 paints | — | **~16 ms total** (0.0 % steady state) |
-| OS threads | ≤ 16 | **12** |
-| Kernel handles | ≤ 400 | **326** |
+| OS threads | ≤ 16 | **13** |
+| Kernel handles | ≤ 500 | **375** idle · **452** after the first icon extraction |
 | GDI objects | ≤ 60 | **8** (before icons) |
+| Icon extraction (first time only) | — | **+2.4 MB private, +76 handles**, then flat |
 | Binary size | ≤ 15 MB | **3.0 MB** |
 | Processes | 1 | **1** |
 | Network connections | 0 | **0** |
@@ -168,7 +169,7 @@ what keeps matching and ranking testable without a desktop session.
 | **P1** ✅ | `core`: matcher, ranker, config, cache format | 31 test functions green; 3 000 entries in **0.11 ms** |
 | **P2** ✅ | Sources + window + launch | 96 apps found (73 Start Menu, 11 Store, 15 App Paths, 12 PATH after the GUI filter); `.lnk` and UWP both launch; hotkey steals the foreground from another app |
 | **P3** ✅ | Frecency wired to the ranker, `history.json`, tray menu, autostart | Launched apps outrank text matches after a restart (`history.json` round-trips); tray adds, toggles autostart and quits; empty query shows only used apps |
-| **P4** | Polish: icons, DPI, theming, packaging | Budget re-measured; 7-day soak under 20 MB with 0 % idle CPU |
+| **P4** 🚧 | Polish: icons ✅, backdrop, DPI, packaging | Icons cost a one-time shell init and nothing per row; budget re-measured |
 
 ## Risks
 

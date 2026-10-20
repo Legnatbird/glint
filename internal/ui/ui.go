@@ -28,6 +28,7 @@ const (
 type App struct {
 	window  *win.Window
 	fonts   *win.Fonts
+	icons   *iconCache
 	config  core.Config
 	index   func() *core.Index
 	history *core.History
@@ -53,12 +54,19 @@ func New(w *win.Window, cfg core.Config, index func() *core.Index, history *core
 	return &App{
 		window:  w,
 		fonts:   win.NewFonts(uint32(dpi)),
+		icons:   newIconCache(128),
 		config:  cfg,
 		index:   index,
 		history: history,
 		launch:  launch,
 		dpi:     dpi,
 	}
+}
+
+// Close releases the GDI and icon resources owned by the app.
+func (a *App) Close() {
+	a.fonts.Release()
+	a.icons.close()
 }
 
 // Attach wires the app to the window's message callbacks.

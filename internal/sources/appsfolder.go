@@ -21,10 +21,13 @@ func scanAppsFolder(rep *Report) []core.Entry {
 	out := make([]core.Entry, 0, len(apps))
 	for _, app := range apps {
 		out = append(out, core.Entry{
-			Key:    "uwp:" + strings.ToLower(app.AUMID),
-			Name:   app.Name,
-			AUMID:  app.AUMID,
-			Source: core.SourceStartMenu,
+			Key:   "uwp:" + strings.ToLower(app.AUMID),
+			Name:  app.Name,
+			AUMID: app.AUMID,
+			// The shell resolves an icon for this parsing name, which is how a
+			// packaged app gets its real icon without a COM image factory.
+			IconPath: "shell:AppsFolder\\" + app.AUMID,
+			Source:   core.SourceStartMenu,
 		})
 	}
 	return out
