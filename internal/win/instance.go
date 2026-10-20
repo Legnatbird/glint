@@ -12,6 +12,9 @@ const MsgToggle = 0x8001
 
 var procPostMessageW = user32.NewProc("PostMessageW")
 
+// instanceMutex is held for the life of the process so the name stays owned.
+var instanceMutex windows.Handle
+
 // AcquireSingleInstance creates a named mutex. It returns true for the first
 // process and false when another instance already owns the name.
 func AcquireSingleInstance(name string) bool {
@@ -23,9 +26,17 @@ func AcquireSingleInstance(name string) bool {
 	if h == 0 {
 		return true
 	}
-	// The handle is intentionally never closed: it must outlive the process so
-	// the name stays owned.
+	instanceMutex = windows.Handle(h)
 	return callErr != syscall.ERROR_ALREADY_EXISTS
+}
+
+// ReleaseSingleInstance gives the name up so a successor process can take it.
+// Only the restart path needs this: normally the mutex dies with the process.
+func ReleaseSingleInstance() {
+	if instanceMutex != 0 {
+		procCloseHandle.Call(uintptr(instanceMutex))
+		instanceMutex = 0
+	}
 }
 
 // PostToRunningInstance sends msg to the window of a previous instance.

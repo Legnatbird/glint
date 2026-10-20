@@ -121,6 +121,10 @@ func run(cfg core.Config, demo string, seconds int, startWithSettings bool) {
 		debugf("autostart error: %v", err)
 	}
 
+	// The tray handle is needed by restartLauncher, which the settings form can
+	// trigger before the tray exists.
+	var tray *win.Tray
+
 	// The settings window is created on first use. A launcher that is never
 	// configured should not pay for a window, its fonts and its handles.
 	var settings *win.SettingsWindow
@@ -138,7 +142,19 @@ func run(cfg core.Config, demo string, seconds int, startWithSettings bool) {
 				Save:       func() error { return cfg.Save(configPath()) },
 				Hotkey:     hotkey.apply,
 				HotkeyLock: hotkey.lock,
-				Backdrop:   func(mode string) error { return applyBackdrop(shell, mode, dpi) },
+				// The presentation mode is baked into the window when it is created:
+				// adding WS_EX_LAYERED to a live window does not rebuild its surface,
+				// so applying the accent here would leave a translucent panel with no
+				// blur. Save the choice and relaunch instead.
+				Backdrop: func(mode string) error {
+					cfg.Backdrop = mode
+					if err := cfg.Save(configPath()); err != nil {
+						return err
+					}
+					debugf("backdrop %s: restarting", mode)
+					restart(shell, tray)
+					return nil
+				},
 				Autostart:  win.SetAutostart,
 				MaxResults: app.SetMaxResults,
 				Rescan:     func() { scanner.rebuild() },
@@ -165,7 +181,7 @@ func run(cfg core.Config, demo string, seconds int, startWithSettings bool) {
 	})
 	shell.OnClose(shell.PostQuit)
 
-	tray, err := win.NewTray(shell.HWND(), "app-launcher")
+	tray, err = win.NewTray(shell.HWND(), "app-launcher")
 	if err != nil {
 		debugf("tray error: %v", err)
 	} else {
@@ -400,6 +416,32 @@ func wantsDump(args []string) bool {
 		}
 	}
 	return false
+}
+
+// restart relaunches the launcher and quits this process.
+//
+// A backdrop can only be applied while the window is being created, so a change
+// means a new process. The relaunch is delegated to a helper that waits a moment:
+// starting it from here would race the single-instance guard, which would hand
+// the launch back to the process that is about to exit.
+func restart(shell *win.Window, tray *win.Tray) {
+	exe, err := os.Executable()
+	if err != nil {
+		debugf("restart: %v", err)
+		return
+	}
+
+	if tray != nil {
+		tray.Remove()
+	}
+	// Hand the name over before the successor starts, or it would think another
+	// launcher is already running and just ask this one to toggle.
+	win.ReleaseSingleInstance()
+	if err := win.ShellExecute(exe, "", "", false); err != nil {
+		debugf("restart: %v", err)
+		return
+	}
+	shell.PostQuit()
 }
 
 // applyBackdrop switches the launcher window between the two backdrops without
