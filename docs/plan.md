@@ -173,6 +173,22 @@ what keeps matching and ranking testable without a desktop session.
 | **P4** ✅ | Polish: app icons ✅, acrylic ✅, the launcher's own icon in the tray, the title bar and the executable ✅ | Single-monitor target: per-monitor DPI changes are out of scope and `WM_DPICHANGED` is not handled |
 | **P5** ✅ | Settings window: editable controls, live apply | Every control in the table below edits `config.json` and reaches the running launcher without a restart; the hotkey is released while a combination is recorded |
 
+### App icons
+
+Windows offers a packaged app's mark in two forms: the app's own logo, which is
+transparent around its edges, and a *plated* tile that composites the same art
+over a solid accent-colour square. `IShellItemImageFactory::GetImage` returns the
+plated form when asked with `SIIGBF_ICONONLY` and the plain logo with no flags, so
+the launcher asks for the logo: a list of rows wants the app's art, not a wall of
+blue squares.
+
+Those logos carry an alpha channel and neither drawing path handles them:
+`DrawIconEx` decides transparency from a 1bpp AND mask, and `AlphaBlend`
+rejects the shell's surfaces with `ERROR_INVALID_PARAMETER` on this build. The
+pixels are therefore kept in Go, resampled bilinearly, composited over the row
+colour and blitted with `StretchDIBits` — one call per icon, no GDI handle per
+app, and antialiased edges for the price of 784 pixels per row.
+
 ## P5 — settings window
 
 Built as decided: a **separate window** (own overlap window, title bar, resizable),

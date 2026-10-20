@@ -48,7 +48,12 @@ type paintStruct struct {
 
 // Canvas wraps the device context handed out by WM_PAINT. It is only valid
 // inside the paint callback.
-type Canvas struct{ hdc uintptr }
+type Canvas struct {
+	hdc uintptr
+	// scratchBuf is reused by icons that must be composited in Go, so a paint
+	// pass allocates once instead of once per row.
+	scratchBuf []byte
+}
 
 // Fill paints a solid rectangle. The color is 0x00BBGGRR.
 func (c *Canvas) Fill(r Rect, bgr uint32) {

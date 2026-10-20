@@ -115,11 +115,12 @@ func (a *App) paintResults(c *win.Canvas, l layout) {
 		}
 
 		y := l.listTop + i*l.rowH
-		if idx == a.selected {
+		selected := idx == a.selected
+		if selected {
 			c.Fill(win.Rect{Left: 0, Top: y, Right: a.width, Bottom: y + l.rowH}, colorSelection)
 			c.Fill(win.Rect{Left: 0, Top: y, Right: a.scale(3), Bottom: y + l.rowH}, colorAccent)
 		}
-		a.paintRow(c, a.results[idx], y, l)
+		a.paintRow(c, a.results[idx], y, l, selected)
 	}
 
 	if len(a.results) == 0 && len(a.query) > 0 {
@@ -129,12 +130,18 @@ func (a *App) paintResults(c *win.Canvas, l layout) {
 
 // paintRow draws one result: icon, then the name with the matched runes in the
 // accent color. y is the top of the row, not of the text.
-func (a *App) paintRow(c *win.Canvas, r core.Result, y int32, l layout) {
+func (a *App) paintRow(c *win.Canvas, r core.Result, y int32, l layout, selected bool) {
 	iconSize := a.scale(28)
 	iconGap := a.scale(14)
 
+	// Icons decoded from the shell carry alpha, so they need the colour behind
+	// them in order to composite.
+	background := ColorBackground
+	if selected {
+		background = colorSelection
+	}
 	icon := a.icons.get(r.Entry.IconPath)
-	icon.Draw(c, l.pad, y+(l.rowH-iconSize)/2, iconSize)
+	icon.Draw(c, l.pad, y+(l.rowH-iconSize)/2, iconSize, background)
 
 	x := l.pad + iconSize + iconGap
 	textY := y + (l.rowH-c.LineHeight())/2

@@ -173,7 +173,12 @@ func shellFolderName(folder comPtr, pidl unsafe.Pointer, flags uint32) string {
 var packagedIcons sync.Map // lowercase AUMID -> Icon
 
 const (
-	siigbfIconOnly = 0x00000004
+	// GetImage is called with no flags on purpose. SIIGBF_ICONONLY returns the
+	// shell's *plated* tile: the app's art composited over a solid accent-colour
+	// square (#0078D7). The Start menu shows the app's own logo, which is
+	// transparent around its edges, and that is what a list of rows wants: a
+	// blue plate per Store app would be a wall of squares.
+	siigbfNoFlags  = 0
 	iconSizePixels = 32
 )
 
@@ -216,21 +221,16 @@ func extractItemImage(folder comPtr, pidl unsafe.Pointer) (Icon, error) {
 	sizeArg := uintptr(iconSizePixels) | uintptr(iconSizePixels)<<32
 	var bitmap windows.Handle
 	// IShellItemImageFactory::GetImage is vtable slot 3.
-	if _, err := factory.call(3, sizeArg, siigbfIconOnly, uintptr(unsafe.Pointer(&bitmap))); err != nil || bitmap == 0 {
+	if _, err := factory.call(3, sizeArg, siigbfNoFlags, uintptr(unsafe.Pointer(&bitmap))); err != nil || bitmap == 0 {
 		return Icon{}, fmt.Errorf("win: GetImage: %w", err)
 	}
+	defer procDeleteObject.Call(uintptr(bitmap))
 
-	mask, _, _ := procCreateBitmap.Call(iconSizePixels, iconSizePixels, 1, 1, 0)
-	info := iconInfo{fIcon: 1, hbmColor: bitmap, hbmMask: windows.Handle(mask)}
-	icon, _, callErr := procCreateIconIndirect.Call(uintptr(unsafe.Pointer(&info)))
-	procDeleteObject.Call(uintptr(bitmap))
-	if mask != 0 {
-		procDeleteObject.Call(mask)
+	pixels, err := readBitmapPixels(bitmap, iconSizePixels)
+	if err != nil {
+		return Icon{}, err
 	}
-	if icon == 0 {
-		return Icon{}, fmt.Errorf("win: CreateIconIndirect: %w", callErr)
-	}
-	return Icon{h: windows.Handle(icon)}, nil
+	return Icon{pixels: &iconPixels{size: iconSizePixels, bgra: pixels}}, nil
 }
 
 type iconInfo struct {

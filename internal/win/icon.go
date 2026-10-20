@@ -37,8 +37,12 @@ type shFileInfo struct {
 	szTypeName    [80]uint16
 }
 
-// Icon is an HICON owned by the caller.
-type Icon struct{ h windows.Handle }
+// Icon is the caller's to destroy. It holds either an HICON, or decoded pixels
+// when the shell handed back a 32bpp bitmap (packaged apps).
+type Icon struct {
+	h      windows.Handle
+	pixels *iconPixels
+}
 
 // LoadShellIcon asks the shell for the icon of path.
 func LoadShellIcon(path string) (Icon, error) {
@@ -66,8 +70,13 @@ func LoadShellIcon(path string) (Icon, error) {
 	return Icon{h: info.hIcon}, nil
 }
 
-// Draw paints the icon at (x, y) with the requested size.
-func (i Icon) Draw(c *Canvas, x, y, size int32) {
+// Draw paints the icon at (x, y) with the requested size. bg is the colour the
+// row paints behind it, which pixel icons need in order to composite.
+func (i Icon) Draw(c *Canvas, x, y, size int32, bg uint32) {
+	if i.pixels != nil {
+		i.pixels.draw(c, x, y, size, bg)
+		return
+	}
 	if i.h == 0 {
 		return
 	}
@@ -79,8 +88,9 @@ func (i Icon) Draw(c *Canvas, x, y, size int32) {
 	)
 }
 
-// Destroy releases the native icon.
+// Destroy releases whatever the icon owns.
 func (i Icon) Destroy() {
+	i.pixels = nil
 	if i.h != 0 {
 		procDestroyIcon.Call(uintptr(i.h))
 	}
