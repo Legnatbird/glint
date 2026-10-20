@@ -238,6 +238,7 @@ func (r *rebuilder) rebuild() {
 			ExcludeFolders:  r.cfg.ExcludeFolders,
 			PathScope:       r.cfg.PathScope,
 			IncludeAppPaths: r.cfg.IncludeAppPaths,
+			ManualApps:      r.cfg.ManualApps,
 		})
 		if len(rep.Entries) == 0 {
 			return
