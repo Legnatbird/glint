@@ -165,6 +165,7 @@ func showTrayMenu(tray *win.Tray, app *ui.App, cfg *core.Config, scanner *rebuil
 		{ID: 1, Label: "Show launcher"},
 		{ID: 2, Label: "Rebuild index"},
 		{ID: 3, Label: "Start with Windows", Checked: win.AutostartEnabled()},
+		{ID: 5, Label: "Settings (config.json)…"},
 		{Separator: true},
 		{ID: 4, Label: "Quit"},
 	}) {
@@ -183,6 +184,11 @@ func showTrayMenu(tray *win.Tray, app *ui.App, cfg *core.Config, scanner *rebuil
 		}
 		if err := cfg.Save(configPath()); err != nil {
 			fmt.Fprintln(os.Stderr, "config:", err)
+		}
+
+	case 5:
+		if err := win.ShellExecute(configPath(), "", "", false); err != nil {
+			fmt.Fprintln(os.Stderr, "settings:", err)
 		}
 
 	case 4:
