@@ -230,6 +230,7 @@ func extractItemImage(folder comPtr, pidl unsafe.Pointer) (Icon, error) {
 	if err != nil {
 		return Icon{}, err
 	}
+
 	return Icon{pixels: &iconPixels{size: iconSizePixels, bgra: pixels}}, nil
 }
 

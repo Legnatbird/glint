@@ -85,9 +85,12 @@ func (p *iconPixels) draw(c *Canvas, x, y, size int32, bg uint32) {
 
 // composite resamples the icon to dst x dst over a solid background.
 func (p *iconPixels) composite(out []byte, dst int, bg uint32) {
-	bgB := byte(bg)
+	// bg is a COLORREF (0x00BBGGRR): the low byte is red, not blue. Reading it
+	// the other way round paints the icon's transparent margin in a colour that
+	// misses the row by a few levels, which shows up as a box around the icon.
+	bgB := byte(bg >> 16)
 	bgG := byte(bg >> 8)
-	bgR := byte(bg >> 16)
+	bgR := byte(bg)
 
 	src := int(p.size)
 	scale := float64(src) / float64(dst)
@@ -130,14 +133,17 @@ func (p *iconPixels) composite(out []byte, dst int, bg uint32) {
 				sample[ch] = topMix*(1-fy) + bottomMix*fy
 			}
 
-			// Straight alpha over the background; the result is opaque, so
-			// StretchDIBits can copy it without touching the alpha channel.
+			// RGB is pre-blended over the row colour, which is what a solid
+			// window blits. The alpha channel is carried through unchanged: on
+			// the layered (acrylic) window GDI paint lands at partial opacity and
+			// DWM composites per pixel, so an opaque margin would punch a square
+			// hole in the row and read as a box around the icon.
 			a := sample[3] / 255
 			offset := (dy*dst + dx) * 4
 			out[offset+0] = clampByte(sample[0]*a + float64(bgB)*(1-a))
 			out[offset+1] = clampByte(sample[1]*a + float64(bgG)*(1-a))
 			out[offset+2] = clampByte(sample[2]*a + float64(bgR)*(1-a))
-			out[offset+3] = 255
+			out[offset+3] = clampByte(sample[3])
 		}
 	}
 }

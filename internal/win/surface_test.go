@@ -21,24 +21,26 @@ func TestCompositeOverBackground(t *testing.T) {
 		src                 []byte
 		bg                  uint32
 		wantB, wantG, wantR byte
+		wantA               byte
 	}{
 		{
 			name:  "opaque source replaces the background",
 			src:   solid(dst, 0, 0, 255, 255),
 			bg:    0x1F1A1A,
-			wantB: 0, wantG: 0, wantR: 255,
+			wantB: 0, wantG: 0, wantR: 255, wantA: 255,
 		},
 		{
-			name:  "transparent source keeps the background",
-			src:   solid(dst, 0, 0, 255, 0),
-			bg:    0x1F1A1A, // B=0x1A, G=0x1A, R=0x1F
-			wantB: 0x1A, wantG: 0x1A, wantR: 0x1F,
+			name: "transparent source keeps the background and stays transparent",
+			src:  solid(dst, 0, 0, 255, 0),
+			// COLORREF 0x00BBGGRR for rgb(0x1A, 0x1A, 0x1F) = #1A1A1F.
+			bg:    0x1F1A1A,
+			wantB: 0x1F, wantG: 0x1A, wantR: 0x1A, wantA: 0,
 		},
 		{
 			name:  "half transparent white over black",
 			src:   solid(dst, 255, 255, 255, 128),
 			bg:    0x000000,
-			wantB: 128, wantG: 128, wantR: 128,
+			wantB: 128, wantG: 128, wantR: 128, wantA: 128,
 		},
 	} {
 		out := make([]byte, dst*dst*4)
@@ -50,8 +52,10 @@ func TestCompositeOverBackground(t *testing.T) {
 			t.Errorf("%s: got bgra(%d,%d,%d), want (%d,%d,%d)",
 				tc.name, out[centre+0], out[centre+1], out[centre+2], tc.wantB, tc.wantG, tc.wantR)
 		}
-		if out[centre+3] != 255 {
-			t.Errorf("%s: output alpha = %d, want opaque", tc.name, out[centre+3])
+		// The alpha channel rides along so a layered window composites the icon
+		// over the same backdrop as the row instead of punching a hole in it.
+		if out[centre+3] != tc.wantA {
+			t.Errorf("%s: output alpha = %d, want %d", tc.name, out[centre+3], tc.wantA)
 		}
 	}
 }
@@ -65,7 +69,7 @@ func TestCompositeFillsEveryPixel(t *testing.T) {
 
 	for i := 0; i < len(out); i += 4 {
 		if out[i+3] != 255 {
-			t.Fatalf("pixel %d has alpha %d", i/4, out[i+3])
+			t.Fatalf("pixel %d has alpha %d, want the opaque source", i/4, out[i+3])
 		}
 		if out[i] != 9 || out[i+1] != 9 || out[i+2] != 9 {
 			t.Fatalf("pixel %d = %d,%d,%d, want the source colour", i/4, out[i], out[i+1], out[i+2])
