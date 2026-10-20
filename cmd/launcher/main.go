@@ -284,6 +284,7 @@ func runDump(cfg core.Config) {
 		ExcludeFolders:  cfg.ExcludeFolders,
 		PathScope:       cfg.PathScope,
 		IncludeAppPaths: cfg.IncludeAppPaths,
+		ManualApps:      cfg.ManualApps,
 	})
 
 	fmt.Printf("scanned %d entries in %v\n", len(rep.Entries), rep.Duration.Round(time.Millisecond))

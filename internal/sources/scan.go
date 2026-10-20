@@ -24,6 +24,7 @@ type Options struct {
 	ExcludeFolders []string
 	// PathScope is one of core.PathOff, core.PathGUI or core.PathAll.
 	PathScope       string
+	ManualApps      []core.ManualApp
 	IncludeAppPaths bool
 }
 
@@ -44,6 +45,7 @@ const (
 	sourceStoreApps = "store apps"
 	sourceGames     = "steam games"
 	sourceCustom    = "custom folders"
+	sourceManual    = "manual entries"
 	sourceAppPaths  = "app paths"
 	sourcePath      = "path"
 )
@@ -67,6 +69,7 @@ func Scan(opts Options) Report {
 		rep.add(scanPath(&rep, opts.ExcludeFolders, opts.PathScope != core.PathAll), sourcePath)
 	}
 	rep.add(scanCustomFolders(&rep, opts.CustomFolders, opts.ExcludeFolders), sourceCustom)
+	rep.add(scanManual(&rep, opts.ManualApps), sourceManual)
 
 	sort.Slice(rep.Entries, func(i, j int) bool { return rep.Entries[i].Name < rep.Entries[j].Name })
 	rep.Duration = time.Since(started)

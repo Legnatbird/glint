@@ -21,6 +21,15 @@ const (
 	BackdropAcrylic = "acrylic"
 )
 
+// ManualApp is an application the user adds by hand, for anything no source
+// can discover: launcher-managed games, portable tools, script wrappers.
+type ManualApp struct {
+	Name   string `json:"name"`
+	Target string `json:"target"`
+	Args   string `json:"args,omitempty"`
+	Icon   string `json:"icon,omitempty"`
+}
+
 // Path scopes for scanning the PATH environment variable.
 const (
 	PathOff = "off" // ignore PATH entirely
@@ -40,6 +49,7 @@ type Config struct {
 	CustomFolders   []string      `json:"custom_folders"`
 	ExcludeFolders  []string      `json:"exclude_folders"`
 	IncludeAppPaths bool          `json:"include_app_paths"`
+	ManualApps      []ManualApp   `json:"manual_apps"`
 	History         HistoryConfig `json:"history"`
 }
 
@@ -136,6 +146,17 @@ func (c *Config) Normalize() {
 	default:
 		c.PathScope = defaults.PathScope
 	}
+
+	clean := c.ManualApps[:0]
+	for _, app := range c.ManualApps {
+		app.Name = strings.TrimSpace(app.Name)
+		app.Target = strings.TrimSpace(app.Target)
+		if app.Name == "" || app.Target == "" {
+			continue
+		}
+		clean = append(clean, app)
+	}
+	c.ManualApps = clean
 
 	c.CustomFolders = cleanPaths(c.CustomFolders)
 	c.ExcludeFolders = cleanPaths(c.ExcludeFolders)
