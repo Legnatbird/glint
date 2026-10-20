@@ -56,11 +56,14 @@ type Config struct {
 // DefaultConfig is also the fallback for every invalid field.
 func DefaultConfig() Config {
 	return Config{
-		Hotkey:          "ctrl+alt+space",
-		MaxResults:      8,
-		Theme:           "dark",
-		PathScope:       PathGUI,
-		Backdrop:        BackdropAcrylic,
+		Hotkey:     "ctrl+alt+space",
+		MaxResults: 8,
+		Theme:      "dark",
+		PathScope:  PathGUI,
+		// Solid, not acrylic: on Windows 10 the accent policy paints the whole
+		// window rectangle and is not clipped by the rounded region, so acrylic
+		// costs the corners. It stays available as an option.
+		Backdrop:        BackdropSolid,
 		IncludeAppPaths: true, History: HistoryConfig{Enabled: true, MaxEntries: 2000},
 	}
 }

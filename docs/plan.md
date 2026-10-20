@@ -222,7 +222,7 @@ Rules it has to respect:
 | MSI advertised shortcuts resolve to a stub | App "opens" nothing | Launch the `.lnk` via ShellExecute; never the parsed target |
 | Some UWP entries lack a launchable AUMID | Dead result rows | Validate at index time; drop entries that fail activation |
 | Icon extraction cost | Slow first paint, handle growth | Lazy per-visible-row icons, LRU cap 64, GDI handle budget asserted in tests |
-| Windows 10 has no Mica | Square, flat window vs Win11 | Acrylic via SetWindowCompositionAttribute, solid as fallback |
+| Windows 10 has no Mica | Square, flat window vs Win11 | Solid is the default; acrylic stays as an option, and on Windows 10 it costs the corners because the accent is not clipped by the window region |
 | Antivirus/SmartScreen on unsigned exe | Distribution friction | Out of scope: portable, personal use |
 
 ## Open decisions (defaults already chosen; say the word to change any)

@@ -120,7 +120,10 @@ func TestMaxResultsStepsAndClamps(t *testing.T) {
 }
 
 func TestBackdropSwitchAppliesLive(t *testing.T) {
+	// The starting point is pinned so the test does not depend on which backdrop
+	// the defaults happen to prefer.
 	h := newHarness(t)
+	h.cfg.Backdrop = core.BackdropAcrylic
 	h.selectRow(t, "Backdrop")
 
 	h.press(win.KeyRight)
@@ -134,6 +137,17 @@ func TestBackdropSwitchAppliesLive(t *testing.T) {
 	h.press(win.KeyRight)
 	if h.cfg.Backdrop != core.BackdropAcrylic {
 		t.Fatalf("backdrop = %q, want acrylic", h.cfg.Backdrop)
+	}
+	if len(h.backdrops) != 2 || h.backdrops[1] != core.BackdropAcrylic {
+		t.Fatalf("backdrop hook saw %v, want the switch back to acrylic", h.backdrops)
+	}
+}
+
+// The default has to be the backdrop whose corners we can actually keep clean on
+// Windows 10.
+func TestDefaultBackdropIsSolid(t *testing.T) {
+	if got := core.DefaultConfig().Backdrop; got != core.BackdropSolid {
+		t.Fatalf("default backdrop = %q, want solid", got)
 	}
 }
 

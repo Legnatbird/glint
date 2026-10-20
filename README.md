@@ -14,7 +14,7 @@ Plan and living decisions: [docs/plan.md](docs/plan.md).
 - **P2** complete — 217 apps discovered (Start Menu, Store/UWP, App Paths, PATH),
   drawn result list, global hotkey, `.lnk` and UWP launching.
 - **P3** complete — usage history in `history.json`, frecency drives the ranking, tray menu, autostart toggle.
-- **P4** complete — app icons (shell and Store apps), acrylic backdrop, rounded corners, the launcher's own icon embedded in the executable.
+- **P4** complete — app icons (shell and Store apps), rounded corners, optional acrylic backdrop, the launcher's own icon embedded in the executable.
 - **P5** complete — settings window: editable controls that apply live, no restart.
 
 ## Requirements
@@ -86,7 +86,7 @@ defaults, unknown fields are ignored, and an invalid value never breaks startup.
   "max_results": 8,
   "theme": "dark",
   "path_scope": "gui",
-  "backdrop": "acrylic",
+  "backdrop": "solid",
   "autostart": false,
   "custom_folders": ["D:\\Portables"],
   "exclude_folders": [],
@@ -105,9 +105,14 @@ defaults, unknown fields are ignored, and an invalid value never breaks startup.
 
 Windows system folders and the `WindowsApps` alias stubs are always skipped.
 
-`backdrop` is `"acrylic"` (default) or `"solid"`. Acrylic goes through
+`backdrop` is `"solid"` (default) or `"acrylic"`. Acrylic goes through
 `SetWindowCompositionAttribute`, an API Microsoft never documented; if the call
 fails the launcher silently keeps the solid background.
+
+Solid is the default on purpose. The accent paints the whole window rectangle and
+is not clipped by the rounded region, so on Windows 10 acrylic shows as a dark
+sliver in the four corners. Windows 11 rounds the window through DWM and does not
+have that problem.
 
 ## Inspect what it found
 
