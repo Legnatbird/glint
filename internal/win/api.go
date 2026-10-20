@@ -52,11 +52,14 @@ const (
 	wsPopup        = 0x80000000
 	wsClipChildren = 0x02000000
 
-	wsExToolWindow = 0x00000080
-	wsExTopmost    = 0x00000008
-	wsExLayered    = 0x00080000
+	wsExToolWindow     = 0x00000080
+	wsExTopmost        = 0x00000008
+	wsExLayered        = 0x00080000
+	wsExAppWindow      = 0x00040000
+	wsOverlappedWindow = 0x00CF0000
 
 	wmDestroy    = 0x0002
+	wmClose      = 0x0010
 	wmActivate   = 0x0006
 	wmPaint      = 0x000F
 	wmTimer      = 0x0113
