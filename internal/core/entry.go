@@ -8,6 +8,7 @@ type Source uint8
 
 const (
 	SourceStartMenu Source = iota
+	SourceGame
 	SourceCustomFolder
 	SourceAppPaths
 	SourcePath

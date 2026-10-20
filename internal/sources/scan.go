@@ -42,6 +42,7 @@ const (
 	maxPerRoot      = 5000
 	sourceStartMenu = "start menu"
 	sourceStoreApps = "store apps"
+	sourceGames     = "steam games"
 	sourceCustom    = "custom folders"
 	sourceAppPaths  = "app paths"
 	sourcePath      = "path"
@@ -58,6 +59,7 @@ func Scan(opts Options) Report {
 
 	rep.add(scanStartMenu(&rep), sourceStartMenu)
 	rep.add(scanAppsFolder(&rep), sourceStoreApps)
+	rep.add(scanSteam(&rep), sourceGames)
 	if opts.IncludeAppPaths {
 		rep.add(scanAppPaths(&rep), sourceAppPaths)
 	}
