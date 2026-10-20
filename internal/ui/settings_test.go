@@ -358,3 +358,30 @@ func TestSettingsRowIsInjectedFirst(t *testing.T) {
 		}
 	}
 }
+
+// A backdrop change needs a restart, so the hook can ask first and decline. That
+// has to look like "nothing happened", not like a failure.
+func TestBackdropChangeCanBeCancelled(t *testing.T) {
+	h := newHarness(t)
+	h.cfg.Backdrop = core.BackdropAcrylic
+	h.selectRow(t, "Backdrop")
+	h.form.hooks.Backdrop = func(string) error { return ErrCancelled }
+
+	h.press(win.KeyRight)
+
+	if h.cfg.Backdrop != core.BackdropAcrylic {
+		t.Fatalf("backdrop = %q, want the previous value", h.cfg.Backdrop)
+	}
+	if h.saved != 0 {
+		t.Fatalf("a cancelled change was saved %d times", h.saved)
+	}
+	if h.form.failed {
+		t.Fatal("a cancellation was reported as an error")
+	}
+	if h.form.status != "Backdrop unchanged" {
+		t.Fatalf("status = %q, want it to say nothing changed", h.form.status)
+	}
+	if len(h.backdrops) != 0 {
+		t.Fatalf("backdrop hook list = %v, want no applied change", h.backdrops)
+	}
+}

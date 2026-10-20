@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"errors"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -8,6 +9,10 @@ import (
 	"applauncher/internal/core"
 	"applauncher/internal/win"
 )
+
+// ErrCancelled is what a hook returns when the user backed out of a change. The
+// form puts the old value back and says so neutrally, because nothing failed.
+var ErrCancelled = errors.New("ui: change cancelled")
 
 // Settings is the form that lives inside the settings window.
 //
@@ -633,6 +638,10 @@ func (s *Settings) stepBackdrop(delta int) {
 	s.cfg.Backdrop = next
 	if err := s.hooks.Backdrop(next); err != nil {
 		s.cfg.Backdrop = previous
+		if errors.Is(err, ErrCancelled) {
+			s.setStatus("Backdrop unchanged", false)
+			return
+		}
 		s.setError("Cannot switch backdrop: " + err.Error())
 		return
 	}

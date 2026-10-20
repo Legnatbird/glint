@@ -145,8 +145,14 @@ func run(cfg core.Config, demo string, seconds int, startWithSettings bool) {
 				// The presentation mode is baked into the window when it is created:
 				// adding WS_EX_LAYERED to a live window does not rebuild its surface,
 				// so applying the accent here would leave a translucent panel with no
-				// blur. Save the choice and relaunch instead.
+				// blur. Ask first, then save the choice and relaunch.
 				Backdrop: func(mode string) error {
+					question := fmt.Sprintf(
+						"The backdrop changes to %s.\n\nThat needs the launcher to restart, and this window closes with it.\n\nRestart now?",
+						mode)
+					if !win.Confirm(settings.HWND(), "app-launcher", question) {
+						return ui.ErrCancelled
+					}
 					cfg.Backdrop = mode
 					if err := cfg.Save(configPath()); err != nil {
 						return err
