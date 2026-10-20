@@ -11,7 +11,7 @@ import (
 
 // CacheSchema is bumped whenever the meaning of a cached Entry changes. An old
 // cache is ignored and rebuilt, never migrated.
-const CacheSchema = 1
+const CacheSchema = 2
 
 // Cache is the on-disk index, so the first hotkey of the day does not wait for
 // a full scan of the Start Menu.

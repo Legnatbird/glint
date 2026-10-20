@@ -2,6 +2,7 @@ package win
 
 import (
 	"fmt"
+	"strings"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -41,6 +42,11 @@ type Icon struct{ h windows.Handle }
 
 // LoadShellIcon asks the shell for the icon of path.
 func LoadShellIcon(path string) (Icon, error) {
+	// Packaged apps have no file: their icon was captured during the scan.
+	if aumid, ok := strings.CutPrefix(path, "aumid:"); ok {
+		return loadPackagedIcon(aumid)
+	}
+
 	ptr, err := windows.UTF16PtrFromString(path)
 	if err != nil {
 		return Icon{}, err

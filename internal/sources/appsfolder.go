@@ -26,7 +26,7 @@ func scanAppsFolder(rep *Report) []core.Entry {
 			AUMID: app.AUMID,
 			// The shell resolves an icon for this parsing name, which is how a
 			// packaged app gets its real icon without a COM image factory.
-			IconPath: "shell:AppsFolder\\" + app.AUMID,
+			IconPath: "aumid:" + strings.ToLower(app.AUMID),
 			Source:   core.SourceStartMenu,
 		})
 	}

@@ -3,6 +3,7 @@ package win
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -38,9 +39,16 @@ type strret struct {
 var (
 	procStrRetToBufW = shlwapi.NewProc("StrRetToBufW")
 
-	iidShellItem   = &guid{0x43826D1E, 0xE718, 0x42EE, [8]byte{0xBC, 0x55, 0xA1, 0xE2, 0x61, 0xC3, 0x7B, 0xFE}}
-	iidShellFolder = &guid{0x000214E6, 0x0000, 0x0000, [8]byte{0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46}}
-	bhidSFObject   = &guid{0x3981E224, 0xF559, 0x11D3, [8]byte{0x8E, 0x3A, 0x00, 0xC0, 0x4F, 0x68, 0x37, 0xD5}}
+	procSHCreateItemWithParent = shell32.NewProc("SHCreateItemWithParent")
+	procCreateIconIndirect     = user32.NewProc("CreateIconIndirect")
+	procCreateBitmap           = gdi32.NewProc("CreateBitmap")
+
+	iidShellItem    = &guid{0x43826D1E, 0xE718, 0x42EE, [8]byte{0xBC, 0x55, 0xA1, 0xE2, 0x61, 0xC3, 0x7B, 0xFE}}
+	iidShellFolder  = &guid{0x000214E6, 0x0000, 0x0000, [8]byte{0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46}}
+	iidShellItem2   = &guid{0x7E9FB0D3, 0x919F, 0x4307, [8]byte{0xAB, 0x2E, 0x9B, 0x18, 0x60, 0x31, 0x0C, 0x93}}
+	iidImageFactory = &guid{0xBCC18B79, 0xBA16, 0x442F, [8]byte{0x80, 0xC4, 0x8A, 0x59, 0xC3, 0x0C, 0x46, 0x3B}}
+
+	bhidSFObject = &guid{0x3981E224, 0xF559, 0x11D3, [8]byte{0x8E, 0x3A, 0x00, 0xC0, 0x4F, 0x68, 0x37, 0xD5}}
 )
 
 // ShellApp is one entry of the AppsFolder namespace.
@@ -100,10 +108,14 @@ func EnumerateAppsFolder() ([]ShellApp, error) {
 
 		name := shellFolderName(folder, pidl, shgdnNormal)
 		aumid := shellFolderName(folder, pidl, shgdnForParsing)
+		icon, iconErr := extractItemImage(folder, pidl)
 		procCoTaskMemFree.Call(uintptr(pidl))
 
 		if name != "" && strings.Contains(aumid, "!") {
 			apps = append(apps, ShellApp{Name: name, AUMID: aumid})
+			if iconErr == nil {
+				packagedIcons.Store(packagedIconKey(aumid), icon)
+			}
 		}
 	}
 	return apps, nil
@@ -151,4 +163,80 @@ func shellFolderName(folder comPtr, pidl unsafe.Pointer, flags uint32) string {
 		return ""
 	}
 	return windows.UTF16ToString(buf)
+}
+
+// packagedIcons keeps the HICON of every packaged app found during the scan.
+//
+// A packaged app has no file path, so its icon can only be extracted while its
+// PIDL is in hand, that is, during the AppsFolder enumeration. The handle is
+// then handed to the UI through its AUMID.
+var packagedIcons sync.Map // lowercase AUMID -> Icon
+
+const (
+	siigbfIconOnly = 0x00000004
+	iconSizePixels = 32
+)
+
+// packagedIconKey is the IconPath form the UI uses for packaged apps.
+func packagedIconKey(aumid string) string { return "aumid:" + strings.ToLower(aumid) }
+
+// loadPackagedIcon returns an icon cached by the last scan.
+func loadPackagedIcon(aumid string) (Icon, error) {
+	if v, ok := packagedIcons.Load(packagedIconKey(aumid)); ok {
+		return v.(Icon), nil
+	}
+	return Icon{}, fmt.Errorf("win: no icon cached for %s", aumid)
+}
+
+// extractItemImage asks IShellItemImageFactory for the item's icon and turns
+// the resulting HBITMAP into an HICON, so the rest of the code keeps drawing
+// with DrawIconEx.
+func extractItemImage(folder comPtr, pidl unsafe.Pointer) (Icon, error) {
+	var rawItem unsafe.Pointer
+	r, _, _ := procSHCreateItemWithParent.Call(
+		0,
+		uintptr(folder.p),
+		uintptr(pidl),
+		uintptr(unsafe.Pointer(iidShellItem2)),
+		uintptr(unsafe.Pointer(&rawItem)),
+	)
+	if int32(r) < 0 || rawItem == nil {
+		return Icon{}, fmt.Errorf("win: SHCreateItemWithParent: 0x%08X", uint32(r))
+	}
+	item := comPtr{p: rawItem}
+	defer item.release()
+
+	factory, err := item.queryInterface(iidImageFactory)
+	if err != nil {
+		return Icon{}, err
+	}
+	defer factory.release()
+
+	// SIZE is two LONGs packed into one register on x64.
+	sizeArg := uintptr(iconSizePixels) | uintptr(iconSizePixels)<<32
+	var bitmap windows.Handle
+	// IShellItemImageFactory::GetImage is vtable slot 3.
+	if _, err := factory.call(3, sizeArg, siigbfIconOnly, uintptr(unsafe.Pointer(&bitmap))); err != nil || bitmap == 0 {
+		return Icon{}, fmt.Errorf("win: GetImage: %w", err)
+	}
+
+	mask, _, _ := procCreateBitmap.Call(iconSizePixels, iconSizePixels, 1, 1, 0)
+	info := iconInfo{fIcon: 1, hbmColor: bitmap, hbmMask: windows.Handle(mask)}
+	icon, _, callErr := procCreateIconIndirect.Call(uintptr(unsafe.Pointer(&info)))
+	procDeleteObject.Call(uintptr(bitmap))
+	if mask != 0 {
+		procDeleteObject.Call(mask)
+	}
+	if icon == 0 {
+		return Icon{}, fmt.Errorf("win: CreateIconIndirect: %w", callErr)
+	}
+	return Icon{h: windows.Handle(icon)}, nil
+}
+
+type iconInfo struct {
+	fIcon    int32
+	xHotspot uint32
+	yHotspot uint32
+	hbmMask  windows.Handle
+	hbmColor windows.Handle
 }
