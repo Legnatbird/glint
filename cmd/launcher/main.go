@@ -106,7 +106,7 @@ func loadIndex(index *atomic.Pointer[core.Index], cfg core.Config) {
 		rep := sources.Scan(sources.Options{
 			CustomFolders:   cfg.CustomFolders,
 			ExcludeFolders:  cfg.ExcludeFolders,
-			IncludePath:     cfg.IncludePath,
+			PathScope:       cfg.PathScope,
 			IncludeAppPaths: cfg.IncludeAppPaths,
 		})
 		if len(rep.Entries) == 0 {
@@ -152,14 +152,14 @@ func runDump(cfg core.Config) {
 	rep := sources.Scan(sources.Options{
 		CustomFolders:   cfg.CustomFolders,
 		ExcludeFolders:  cfg.ExcludeFolders,
-		IncludePath:     cfg.IncludePath,
+		PathScope:       cfg.PathScope,
 		IncludeAppPaths: cfg.IncludeAppPaths,
 	})
 
 	fmt.Printf("scanned %d entries in %v\n", len(rep.Entries), rep.Duration.Round(time.Millisecond))
-	fmt.Printf("per source: start menu=%d store apps=%d app paths=%d path=%d custom=%d\n",
+	fmt.Printf("per source: start menu=%d store apps=%d app paths=%d path(%s)=%d custom=%d\n",
 		rep.Counts["start menu"], rep.Counts["store apps"], rep.Counts["app paths"],
-		rep.Counts["path"], rep.Counts["custom folders"])
+		cfg.PathScope, rep.Counts["path"], rep.Counts["custom folders"])
 	for _, w := range rep.Warnings {
 		fmt.Println("warning:", w)
 	}

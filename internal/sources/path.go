@@ -12,8 +12,9 @@ import (
 //
 // Windows system folders are skipped on purpose: system32 alone holds hundreds
 // of executables that nobody launches from a launcher and would bury the real
-// applications.
-func scanPath(rep *Report, excludes []string) []core.Entry {
+// applications. When guiOnly is set, console binaries are skipped as well; the
+// PE subsystem decides, not the file name.
+func scanPath(rep *Report, excludes []string, guiOnly bool) []core.Entry {
 	systemRoot := os.Getenv("SystemRoot")
 
 	var out []core.Entry
@@ -50,7 +51,14 @@ func scanPath(rep *Report, excludes []string) []core.Entry {
 			if de.IsDir() || !strings.EqualFold(filepath.Ext(de.Name()), ".exe") {
 				continue
 			}
-			out = append(out, exeEntry(filepath.Join(dir, de.Name()), core.SourcePath))
+			full := filepath.Join(dir, de.Name())
+			if strings.HasPrefix(strings.ToLower(de.Name()), "unins") {
+				continue
+			}
+			if guiOnly && !isGUIExecutable(full) {
+				continue
+			}
+			out = append(out, exeEntry(full, core.SourcePath))
 		}
 	}
 	return out

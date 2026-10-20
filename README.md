@@ -46,6 +46,34 @@ and shows the launcher on demand.
 
 Starting it again toggles the running instance instead of creating a second one.
 
+## Configuration
+
+`config.json` sits next to the executable. Missing fields fall back to the
+defaults, unknown fields are ignored, and an invalid value never breaks startup.
+
+```json
+{
+  "hotkey": "ctrl+alt+space",
+  "max_results": 8,
+  "theme": "dark",
+  "path_scope": "gui",
+  "custom_folders": ["D:\\Portables"],
+  "exclude_folders": [],
+  "include_app_paths": true,
+  "history": { "enabled": true, "max_entries": 2000 }
+}
+```
+
+`path_scope` decides what PATH contributes:
+
+| Value | Effect |
+|---|---|
+| `"gui"` (default) | Only executables whose PE subsystem is `WINDOWS_GUI`. On this machine: 135 PATH entries become 12. |
+| `"all"` | Every executable on PATH, console tools included. |
+| `"off"` | Ignore PATH entirely. |
+
+Windows system folders and the `WindowsApps` alias stubs are always skipped.
+
 ## Inspect what it found
 
 ```powershell

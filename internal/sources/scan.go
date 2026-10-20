@@ -20,9 +20,10 @@ import (
 
 // Options selects which sources to scan and what to leave out.
 type Options struct {
-	CustomFolders   []string
-	ExcludeFolders  []string
-	IncludePath     bool
+	CustomFolders  []string
+	ExcludeFolders []string
+	// PathScope is one of core.PathOff, core.PathGUI or core.PathAll.
+	PathScope       string
 	IncludeAppPaths bool
 }
 
@@ -60,8 +61,8 @@ func Scan(opts Options) Report {
 	if opts.IncludeAppPaths {
 		rep.add(scanAppPaths(&rep), sourceAppPaths)
 	}
-	if opts.IncludePath {
-		rep.add(scanPath(&rep, opts.ExcludeFolders), sourcePath)
+	if opts.PathScope != core.PathOff {
+		rep.add(scanPath(&rep, opts.ExcludeFolders, opts.PathScope != core.PathAll), sourcePath)
 	}
 	rep.add(scanCustomFolders(&rep, opts.CustomFolders, opts.ExcludeFolders), sourceCustom)
 

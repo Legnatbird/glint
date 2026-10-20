@@ -17,8 +17,11 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.MaxResults != 8 {
 		t.Errorf("max results = %d", cfg.MaxResults)
 	}
-	if !cfg.IncludePath || !cfg.IncludeAppPaths {
-		t.Error("path and app paths should be enabled by default")
+	if cfg.PathScope != core.PathGUI {
+		t.Errorf("path scope = %q, want %q: console tools must be filtered out by default", cfg.PathScope, core.PathGUI)
+	}
+	if !cfg.IncludeAppPaths {
+		t.Error("app paths should be enabled by default")
 	}
 	if cfg.Theme != "dark" {
 		t.Errorf("theme = %q", cfg.Theme)
@@ -101,6 +104,7 @@ func TestConfigNormalizeClampsInvalidValues(t *testing.T) {
 		Hotkey:        "   ",
 		MaxResults:    999,
 		Theme:         "neon",
+		PathScope:     "sometimes",
 		CustomFolders: []string{"  ", `D:\Portables`, `D:\Portables`, ""},
 		History:       core.HistoryConfig{MaxEntries: 0},
 	}
@@ -115,6 +119,9 @@ func TestConfigNormalizeClampsInvalidValues(t *testing.T) {
 	}
 	if cfg.Theme != "dark" {
 		t.Errorf("unknown theme should fall back to dark, got %q", cfg.Theme)
+	}
+	if cfg.PathScope != core.PathGUI {
+		t.Errorf("unknown path scope should fall back to gui, got %q", cfg.PathScope)
 	}
 	if len(cfg.CustomFolders) != 1 || cfg.CustomFolders[0] != `D:\Portables` {
 		t.Errorf("custom folders should be trimmed and deduplicated, got %v", cfg.CustomFolders)

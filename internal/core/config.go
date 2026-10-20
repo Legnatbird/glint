@@ -15,15 +15,22 @@ type HistoryConfig struct {
 	MaxEntries int  `json:"max_entries"`
 }
 
+// Path scopes for scanning the PATH environment variable.
+const (
+	PathOff = "off" // ignore PATH entirely
+	PathGUI = "gui" // only executables that can show a window (default)
+	PathAll = "all" // every executable, including console tools
+)
+
 // Config is the portable configuration file. It lives next to the executable so
 // the whole app is a folder that can be copied or deleted.
 type Config struct {
 	Hotkey          string        `json:"hotkey"`
 	MaxResults      int           `json:"max_results"`
 	Theme           string        `json:"theme"`
+	PathScope       string        `json:"path_scope"`
 	CustomFolders   []string      `json:"custom_folders"`
 	ExcludeFolders  []string      `json:"exclude_folders"`
-	IncludePath     bool          `json:"include_path"`
 	IncludeAppPaths bool          `json:"include_app_paths"`
 	History         HistoryConfig `json:"history"`
 }
@@ -34,7 +41,7 @@ func DefaultConfig() Config {
 		Hotkey:          "ctrl+alt+space",
 		MaxResults:      8,
 		Theme:           "dark",
-		IncludePath:     true,
+		PathScope:       PathGUI,
 		IncludeAppPaths: true,
 		History:         HistoryConfig{Enabled: true, MaxEntries: 2000},
 	}
@@ -108,6 +115,12 @@ func (c *Config) Normalize() {
 	case "dark", "light", "system":
 	default:
 		c.Theme = defaults.Theme
+	}
+
+	switch c.PathScope {
+	case PathOff, PathGUI, PathAll:
+	default:
+		c.PathScope = defaults.PathScope
 	}
 
 	c.CustomFolders = cleanPaths(c.CustomFolders)

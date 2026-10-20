@@ -39,17 +39,17 @@ non-Windows platforms.
 
 | Metric | Budget | Measured |
 |---|---|---|
-| Idle working set, full launcher with 217 apps | ≤ 30 MB | **22.2 MB** hidden · **24.3 MB** visible |
+| Idle working set, full launcher with 96 apps | ≤ 30 MB | **21.9 MB** hidden · **24.3 MB** visible |
 | Idle working set, bare shell (P0 spike) | — | **7.7 MB** before first show · **10.8 MB** after two show/hide cycles |
 | Private bytes (spike) | ≤ 30 MB | **12.6 MB** |
 | Boot: `main` → hotkey registered | ≤ 120 ms | **2.6 ms** |
 | `Show()` (ShowWindow + SetForegroundWindow) | ≤ 50 ms | **3.2 ms** cold · **< 0.1 ms** warm |
 | First `WM_PAINT` after show | ≤ 50 ms | **2.2 ms** |
-| Full scan of every source | ≤ 300 ms | **68 ms** for 217 apps |
+| Full scan of every source | ≤ 300 ms | **74 ms** for 96 apps (163 ms with a cold file cache) |
 | Search over 3 000 entries | ≤ 1 ms | **0.11 ms**, 2 KB allocated per query |
 | CPU, whole 6 s spike run incl. startup and 2 paints | — | **~16 ms total** (0.0 % steady state) |
-| OS threads | ≤ 12 | **9** |
-| Kernel handles | ≤ 300 | **208** |
+| OS threads | ≤ 16 | **12** |
+| Kernel handles | ≤ 400 | **326** |
 | GDI objects | ≤ 60 | **8** (before icons) |
 | Binary size | ≤ 15 MB | **3.0 MB** |
 | Processes | 1 | **1** |
@@ -69,7 +69,8 @@ the usual launcher bloat (frameworks, webviews, idle pollers).
 | Start Menu shortcuts | Recursive scan of `%ProgramData%\Microsoft\Windows\Start Menu\Programs` and `%APPDATA%\Microsoft\Windows\Start Menu\Programs`; parse `.lnk` with `IShellLinkW` for target, args, workdir, icon | `ShellExecuteExW` on the `.lnk` |
 | Store / UWP apps | Enumerate `shell:AppsFolder` (`SHGetKnownFolderItem` + `IShellFolder`); keep the AppUserModelID | `IApplicationActivationManager::ActivateApplication` |
 | Custom folders (config) | Recursive scan for `.exe` / `.lnk` with include/exclude globs | `ShellExecuteExW` on the file |
-| `App Paths` + `PATH` | `HKLM/HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths` and `%PATH%` entries | `ShellExecuteExW` with the resolved path |
+| `App Paths` | `HKLM/HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths` | `ShellExecuteExW` with the resolved path |
+| `PATH` (filtered) | `%PATH%`, minus Windows system folders, minus `WindowsApps` aliases; only PE subsystem `WINDOWS_GUI` unless `path_scope` says otherwise | `ShellExecuteExW` with the resolved path |
 
 **Deduplication** is by canonical identity: resolved target path (case-folded) for
 Win32 entries, AppUserModelID for UWP. When two sources produce the same app,
@@ -165,7 +166,7 @@ what keeps matching and ranking testable without a desktop session.
 |---|---|---|
 | **P0** ✅ | Spike: hidden window, global hotkey, self-measurement | Measured budget met with 3× headroom (see table) |
 | **P1** ✅ | `core`: matcher, ranker, config, cache format | 31 test functions green; 3 000 entries in **0.11 ms** |
-| **P2** ✅ | Sources + window + launch | 217 apps found (73 Start Menu, 11 Store, 15 App Paths, 135 PATH); `.lnk` and UWP both launch; hotkey steals the foreground from another app |
+| **P2** ✅ | Sources + window + launch | 96 apps found (73 Start Menu, 11 Store, 15 App Paths, 12 PATH after the GUI filter); `.lnk` and UWP both launch; hotkey steals the foreground from another app |
 | **P3** | Frecency, tray, autostart, settings JSON | Restart preserves ranking and settings; tray quits cleanly |
 | **P4** | Polish: icons, DPI, theming, packaging | Budget re-measured; 7-day soak under 20 MB with 0 % idle CPU |
 
