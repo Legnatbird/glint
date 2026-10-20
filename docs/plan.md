@@ -170,7 +170,7 @@ what keeps matching and ranking testable without a desktop session.
 | **P1** ✅ | `core`: matcher, ranker, config, cache format | 31 test functions green; 3 000 entries in **0.11 ms** |
 | **P2** ✅ | Sources + window + launch | 96 apps found (73 Start Menu, 11 Store, 15 App Paths, 12 PATH after the GUI filter); `.lnk` and UWP both launch; hotkey steals the foreground from another app |
 | **P3** ✅ | Frecency wired to the ranker, `history.json`, tray menu, autostart | Launched apps outrank text matches after a restart (`history.json` round-trips); tray adds, toggles autostart and quits; empty query shows only used apps |
-| **P4** ✅ | Polish: app icons ✅, acrylic ✅, the launcher's own icon in the tray, the title bar and the executable ✅ | Single-monitor target: per-monitor DPI changes are out of scope and `WM_DPICHANGED` is not handled |
+| **P4** ✅ | Polish: app icons ✅, acrylic ✅, the launcher's own icon in the tray, the title bar and the executable ✅ | Single-monitor target: per-monitor DPI changes are out of scope and `WM_DPICHANGED` is not handled. Corners: DWM on Windows 11, a window region on Windows 10 — the region clip is binary, so the painted border follows the same arc instead of cutting the corner |
 | **P5** ✅ | Settings window: editable controls, live apply | Every control in the table below edits `config.json` and reaches the running launcher without a restart; the hotkey is released while a combination is recorded |
 
 ### App icons

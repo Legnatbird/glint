@@ -108,10 +108,48 @@ func DisableAcrylic(hwnd uintptr) {
 	procSetLayeredWindowAttributes.Call(hwnd, 0, 255, lwaAlpha)
 }
 
+// Round corners, two ways.
+//
+// A window region clips the window to a rounded rectangle, but the clip is
+// binary: the arc is a staircase of full pixels, which at a small radius reads as
+// a diagonal chamfer rather than a corner. Windows 11 can round a window through
+// DWM instead, with antialiasing, so that is tried first and the region stays as
+// the fallback for Windows 10.
+
+const (
+	dwmwaWindowCornerPreference = 33
+
+	// CornerRound is DWMWCP_ROUND.
+	CornerRound = 2
+)
+
+var procDwmSetWindowAttribute = dwmapi.NewProc("DwmSetWindowAttribute")
+
+// RoundCornersDWM asks the compositor to round the window's corners.
+func RoundCornersDWM(hwnd uintptr) error {
+	preference := int32(CornerRound)
+	r, _, callErr := procDwmSetWindowAttribute.Call(
+		hwnd,
+		uintptr(dwmwaWindowCornerPreference),
+		uintptr(unsafe.Pointer(&preference)),
+		uintptr(unsafe.Sizeof(preference)),
+	)
+	if int32(r) < 0 {
+		return fmt.Errorf("win: DwmSetWindowAttribute(corners): 0x%08X: %w", uint32(r), callErr)
+	}
+	return nil
+}
+
+// ClearRegion drops a window region, which is what a window rounded by DWM needs:
+// the two mechanisms would otherwise fight over the same corners.
+func ClearRegion(hwnd uintptr) {
+	procSetWindowRgn.Call(hwnd, 0, 1)
+}
+
 // RoundCorners clips the window to a rounded rectangle.
 //
 // A window region is binary: the corners are antialiased by nothing, which is
-// why the radius stays small. Windows 11 could do this through DWM instead.
+// why the radius stays small.
 func RoundCorners(hwnd uintptr, radius int32) error {
 	var r nativeRect
 	procGetClientRect.Call(hwnd, uintptr(unsafe.Pointer(&r)))

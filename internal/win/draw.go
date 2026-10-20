@@ -66,6 +66,37 @@ func (c *Canvas) Fill(r Rect, bgr uint32) {
 	procDeleteObject.Call(brush)
 }
 
+// RoundBorder outlines a rounded rectangle with a 1px pen. The corners follow
+// the same arc the window region clips: drawing four straight lines instead
+// leaves the light stroke cut diagonally across the corner, which reads as a
+// chamfer rather than a curve.
+func (c *Canvas) RoundBorder(r Rect, radius int32, bgr uint32) {
+	if radius <= 0 || r.Right <= r.Left || r.Bottom <= r.Top {
+		return
+	}
+
+	pen, _, _ := procCreatePen.Call(psSolid, 1, uintptr(bgr))
+	if pen == 0 {
+		return
+	}
+	brush, _, _ := procGetStockObject.Call(hollowBrush)
+	if brush == 0 {
+		procDeleteObject.Call(pen)
+		return
+	}
+
+	oldPen, _, _ := procSelectObject.Call(c.hdc, pen)
+	oldBrush, _, _ := procSelectObject.Call(c.hdc, brush)
+	// The ellipse size is twice the radius, matching CreateRoundRectRgn.
+	procRoundRect.Call(c.hdc,
+		uintptr(r.Left), uintptr(r.Top), uintptr(r.Right), uintptr(r.Bottom),
+		uintptr(radius*2), uintptr(radius*2),
+	)
+	procSelectObject.Call(c.hdc, oldPen)
+	procSelectObject.Call(c.hdc, oldBrush)
+	procDeleteObject.Call(pen)
+}
+
 // Clip intersects the current clip region with r and returns a function that
 // restores the previous region. Callers use it to keep a scrolling list from
 // painting over the header and footer.

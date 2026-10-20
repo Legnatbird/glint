@@ -135,6 +135,7 @@ var (
 	ole32   = windows.NewLazySystemDLL("ole32.dll")
 	shell32 = windows.NewLazySystemDLL("shell32.dll")
 	shlwapi = windows.NewLazySystemDLL("shlwapi.dll")
+	dwmapi  = windows.NewLazySystemDLL("dwmapi.dll")
 
 	procCoInitializeEx   = ole32.NewProc("CoInitializeEx")
 	procCoUninitialize   = ole32.NewProc("CoUninitialize")
@@ -170,6 +171,8 @@ var (
 	procSaveDC              = gdi32.NewProc("SaveDC")
 	procRestoreDC           = gdi32.NewProc("RestoreDC")
 	procIntersectClipRect   = gdi32.NewProc("IntersectClipRect")
+	procCreatePen           = gdi32.NewProc("CreatePen")
+	procRoundRect           = gdi32.NewProc("RoundRect")
 )
 
 // Additional constants used by the shell and painting code.
@@ -184,6 +187,9 @@ const (
 	clsctxInprocServer      = 0x1
 
 	transparentBkMode = 1
+
+	psSolid     = 0
+	hollowBrush = 5 // HOLLOW_BRUSH stock object
 
 	fwNormal = 400
 

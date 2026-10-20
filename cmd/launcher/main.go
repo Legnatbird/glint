@@ -415,15 +415,31 @@ func applyBackdrop(hwnd uintptr, mode string, dpi int32) error {
 		if err := win.EnableAcrylic(hwnd, 0xE8161212, 255); err != nil {
 			return err
 		}
-		return win.RoundCorners(hwnd, 10*dpi/96)
+	} else {
+		win.DisableAcrylic(hwnd)
+		if err := win.SetLayered(hwnd, false); err != nil {
+			return err
+		}
+		debugf("backdrop solid")
 	}
 
-	win.DisableAcrylic(hwnd)
-	if err := win.SetLayered(hwnd, false); err != nil {
-		return err
+	return roundWindow(hwnd, dpi)
+}
+
+// roundWindow gives the launcher rounded corners.
+//
+// DWM is asked first: its corners are antialiased. A window region is the
+// fallback for Windows 10, where the clip is binary and the arc shows as a
+// staircase, so the radius stays small there.
+func roundWindow(hwnd uintptr, dpi int32) error {
+	if err := win.RoundCornersDWM(hwnd); err == nil {
+		win.ClearRegion(hwnd)
+		debugf("corners: dwm")
+		return nil
+	} else {
+		debugf("corners: %v (falling back to a region)", err)
 	}
-	debugf("backdrop solid")
-	return nil
+	return win.RoundCorners(hwnd, ui.CornerRadius*dpi/96)
 }
 
 // hotkeyBinding owns the single global hotkey id and remembers whether it is

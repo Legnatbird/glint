@@ -68,11 +68,17 @@ func (a *App) paint(c *win.Canvas) {
 
 // paintBorder draws a 1px frame so the surface reads as a window even when the
 // desktop behind it is dark. Rounded corners arrive in P4.
+// CornerRadius is the window's corner radius in pixels at 96 dpi. The window
+// region and the painted border have to agree on it, or the border cuts across
+// the arc and the corner looks chamfered.
+const CornerRadius = 14
+
 func (a *App) paintBorder(c *win.Canvas) {
-	c.Fill(win.Rect{Left: 0, Top: 0, Right: a.width, Bottom: 1}, colorBorder)
-	c.Fill(win.Rect{Left: 0, Top: a.height - 1, Right: a.width, Bottom: a.height}, colorBorder)
-	c.Fill(win.Rect{Left: 0, Top: 0, Right: 1, Bottom: a.height}, colorBorder)
-	c.Fill(win.Rect{Left: a.width - 1, Top: 0, Right: a.width, Bottom: a.height}, colorBorder)
+	c.RoundBorder(
+		win.Rect{Left: 0, Top: 0, Right: a.width, Bottom: a.height},
+		a.scale(CornerRadius),
+		colorBorder,
+	)
 }
 
 func (a *App) paintQuery(c *win.Canvas, l layout) {
