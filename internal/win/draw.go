@@ -133,9 +133,9 @@ func NewFonts(dpi uint32) *Fonts {
 		return int32(math.Round(float64(px) * float64(dpi) / 96.0))
 	}
 	return &Fonts{
-		Query:  createFont(scale(22), fwNormal),
-		Row:    createFont(scale(14), fwNormal),
-		Footer: createFont(scale(11), fwNormal),
+		Query:  createFont(scale(24), fwNormal),
+		Row:    createFont(scale(16), fwNormal),
+		Footer: createFont(scale(12), fwNormal),
 	}
 }
 

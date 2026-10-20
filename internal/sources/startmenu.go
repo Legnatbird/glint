@@ -55,6 +55,9 @@ func shortcutEntry(path string, src core.Source) core.Entry {
 		// single row.
 		e.Resolved = sc.Path
 		e.Key = "exe:" + strings.ToLower(sc.Path)
+		// The executable carries the real icon; some shortcuts resolve to the
+		// generic one even when the target has its own.
+		e.IconPath = sc.Path
 	}
 	return e
 }

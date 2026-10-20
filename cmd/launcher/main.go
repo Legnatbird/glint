@@ -62,8 +62,8 @@ func run(cfg core.Config, demo string, seconds int) {
 
 	shell, err := win.NewWindow(win.WindowConfig{
 		Title:      "Launcher",
-		Width:      660 * dpi / 96,
-		Height:     430 * dpi / 96,
+		Width:      700 * dpi / 96,
+		Height:     500 * dpi / 96,
 		Background: ui.ColorBackground,
 		Layered:    cfg.Backdrop == core.BackdropAcrylic,
 	})

@@ -34,7 +34,7 @@ func (a *App) computeLayout() layout {
 		pad:      a.scale(18),
 		inputTop: a.scale(14),
 		inputH:   a.scale(32),
-		rowH:     a.scale(34),
+		rowH:     a.scale(44),
 		footerY:  a.height - a.scale(10),
 	}
 	l.listTop = l.inputTop + l.inputH + a.scale(10)
@@ -130,8 +130,8 @@ func (a *App) paintResults(c *win.Canvas, l layout) {
 // paintRow draws one result: icon, then the name with the matched runes in the
 // accent color. y is the top of the row, not of the text.
 func (a *App) paintRow(c *win.Canvas, r core.Result, y int32, l layout) {
-	iconSize := a.scale(20)
-	iconGap := a.scale(12)
+	iconSize := a.scale(28)
+	iconGap := a.scale(14)
 
 	icon := a.icons.get(r.Entry.IconPath)
 	icon.Draw(c, l.pad, y+(l.rowH-iconSize)/2, iconSize)
