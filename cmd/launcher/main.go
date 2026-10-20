@@ -267,12 +267,14 @@ func launch(entry core.Entry, mode ui.Mode) error {
 
 	case ui.ModeAdmin:
 		if entry.Kind() == core.KindUWP {
-			// Packaged apps are activated, not executed: there is no process to
-			// elevate. Its execution alias could be run with "runas", but the
-			// alias name is not derivable from the AppUserModelID and the stub
-			// files in WindowsApps are zero bytes, so it cannot be discovered
-			// reliably yet.
-			return fmt.Errorf("%s is a packaged app and cannot be elevated from here", entry.Name)
+			// A packaged app is activated, not executed, so the AUMID cannot be
+			// elevated. Its execution alias is an ordinary command, and the
+			// shell will run that one with the "runas" verb.
+			alias := win.ExecutionAlias(entry.AUMID)
+			if alias == "" {
+				return fmt.Errorf("%s declares no execution alias, so it cannot run elevated", entry.Name)
+			}
+			return win.ShellExecute(alias, "", "", true)
 		}
 		return win.ShellExecute(entry.Target, entry.Args, entry.WorkDir, true)
 
