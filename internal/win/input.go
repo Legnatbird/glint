@@ -28,8 +28,14 @@ const (
 	KeyEscape = vkEscape
 	KeyUp     = vkUp
 	KeyDown   = vkDown
+	KeyLeft   = vkLeft
+	KeyRight  = vkRight
 	KeyTab    = vkTab
 	KeyPrior  = vkPrior
-	KeyF5     = 0x74
 	KeyNext   = vkNext
+	KeyHome   = vkHome
+	KeyEnd    = vkEnd
+	KeyDelete = vkDelete
+	KeySpace  = 0x20
+	KeyF5     = 0x74
 )

@@ -47,7 +47,32 @@ var (
 	procSetLayeredWindowAttributes    = user32.NewProc("SetLayeredWindowAttributes")
 	procCreateRoundRectRgn            = gdi32.NewProc("CreateRoundRectRgn")
 	procSetWindowRgn                  = user32.NewProc("SetWindowRgn")
+	procGetWindowLongPtrW             = user32.NewProc("GetWindowLongPtrW")
+	procSetWindowLongPtrW             = user32.NewProc("SetWindowLongPtrW")
 )
+
+// GWL_EXSTYLE as an unsigned value: -20 in two's complement, because a negative
+// constant cannot be converted to uintptr directly.
+const gwlExStyle = ^uintptr(19)
+
+// SetLayered toggles WS_EX_LAYERED on a window that already exists. Acrylic
+// needs it, and switching the backdrop at runtime needs it applied after the
+// fact: the style cannot be changed from outside the creation call.
+func SetLayered(hwnd uintptr, on bool) error {
+	ex, _, _ := procGetWindowLongPtrW.Call(hwnd, gwlExStyle)
+	if on {
+		ex |= wsExLayered
+	} else {
+		ex &^= wsExLayered
+	}
+	procSetWindowLongPtrW.Call(hwnd, gwlExStyle, ex)
+
+	got, _, _ := procGetWindowLongPtrW.Call(hwnd, gwlExStyle)
+	if layered := got&wsExLayered != 0; layered != on {
+		return fmt.Errorf("win: SetWindowLongPtrW(GWL_EXSTYLE) did not stick")
+	}
+	return nil
+}
 
 // EnableAcrylic applies the acrylic tint and the global opacity that lets it
 // show through the painted content. tint is AABBGGRR.

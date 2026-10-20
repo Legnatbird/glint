@@ -73,17 +73,8 @@ func run(cfg core.Config, demo string, seconds int, openSettings bool) {
 	}
 	defer shell.Destroy()
 
-	if cfg.Backdrop == core.BackdropAcrylic {
-		if err := win.RoundCorners(shell.HWND(), 10*dpi/96); err != nil {
-			debugf("rounded corners: %v", err)
-		}
-		// AABBGGRR: dark tint at 91% alpha. The tint is what controls how much
-		// of the blurred desktop reaches the eye; the paint stays opaque.
-		if err := win.EnableAcrylic(shell.HWND(), 0xE8161212, 255); err != nil {
-			debugf("acrylic: %v", err)
-		} else {
-			debugf("acrylic enabled")
-		}
+	if err := applyBackdrop(shell.HWND(), cfg.Backdrop, dpi); err != nil {
+		debugf("backdrop: %v", err)
 	}
 
 	history, err := core.LoadHistory(historyPath(), cfg.History.MaxEntries)
@@ -92,19 +83,14 @@ func run(cfg core.Config, demo string, seconds int, openSettings bool) {
 	}
 
 	settingsFonts := win.NewFonts(uint32(dpi))
-	settings, settingsErr := win.NewSettingsWindow("app-launcher settings", 560*dpi/96, 420*dpi/96)
+	settings, settingsErr := win.NewSettingsWindow("app-launcher settings", 600*dpi/96, 640*dpi/96)
 	if settingsErr != nil {
 		debugf("settings window failed: %v", settingsErr)
-	} else {
-		debugf("settings window ready hwnd=%d", settings.HWND())
-		settings.OnPaint(func(c *win.Canvas) { drawSettings(c, settingsFonts, cfg) })
-		if openSettings {
-			settings.Show()
-		}
+		settings = nil
 	}
 
 	var index atomic.Pointer[core.Index]
-	scanner := &rebuilder{index: &index, cfg: cfg}
+	scanner := &rebuilder{index: &index, cfg: &cfg}
 	scanner.loadCache()
 	scanner.rebuild()
 
@@ -126,6 +112,11 @@ func run(cfg core.Config, demo string, seconds int, openSettings bool) {
 	app.Attach()
 	app.SetSize(shell.ClientSize())
 	app.SetRebuildHandler(func() { scanner.rebuild() })
+	app.SetSettingsHandler(func() {
+		if settings != nil {
+			settings.Show()
+		}
+	})
 
 	shell.OnHotkey(func() {
 		// While the settings window is open it owns the screen.
@@ -136,9 +127,8 @@ func run(cfg core.Config, demo string, seconds int, openSettings bool) {
 	})
 	shell.OnClose(shell.PostQuit)
 
-	if hk, err := win.ParseHotkey(cfg.Hotkey); err != nil {
-		fmt.Fprintln(os.Stderr, "hotkey:", err)
-	} else if err := shell.RegisterHotkey(hk); err != nil {
+	hotkey := &hotkeyBinding{shell: shell}
+	if err := hotkey.apply(cfg.Hotkey); err != nil {
 		debugf("hotkey error: %v", err)
 	} else {
 		debugf("hotkey registered: %s", cfg.Hotkey)
@@ -147,6 +137,29 @@ func run(cfg core.Config, demo string, seconds int, openSettings bool) {
 	debugf("autostart=%v", cfg.Autostart)
 	if err := win.SetAutostart(cfg.Autostart); err != nil {
 		debugf("autostart error: %v", err)
+	}
+
+	// The form owns every edit; each hook applies one change to the running
+	// process, so nothing here waits for a restart.
+	if settings != nil {
+		debugf("settings window ready hwnd=%d", settings.HWND())
+		ui.NewSettings(settings, &cfg, settingsFonts, ui.SettingsHooks{
+			Save:       func() error { return cfg.Save(configPath()) },
+			Hotkey:     hotkey.apply,
+			HotkeyLock: hotkey.lock,
+			Backdrop:   func(mode string) error { return applyBackdrop(shell.HWND(), mode, dpi) },
+			Autostart:  win.SetAutostart,
+			MaxResults: app.SetMaxResults,
+			Rescan:     func() { scanner.rebuild() },
+			ClearLog: func() error {
+				history.Clear()
+				return history.Save(historyPath())
+			},
+			Entries: history.Len,
+		})
+		if openSettings {
+			settings.Show()
+		}
 	}
 
 	tray, err := win.NewTray(shell.HWND(), "app-launcher")
@@ -184,7 +197,7 @@ func showTrayMenu(tray *win.Tray, app *ui.App, cfg *core.Config, scanner *rebuil
 		{ID: 1, Label: "Show launcher"},
 		{ID: 2, Label: "Rebuild index"},
 		{ID: 3, Label: "Start with Windows", Checked: win.AutostartEnabled()},
-		{ID: 5, Label: "Settings (config.json)…"},
+		{ID: 5, Label: "Settings…"},
 		{Separator: true},
 		{ID: 4, Label: "Quit"},
 	}) {
@@ -222,7 +235,9 @@ func showTrayMenu(tray *win.Tray, app *ui.App, cfg *core.Config, scanner *rebuil
 // rebuilder owns the index snapshot and guarantees one scan at a time.
 type rebuilder struct {
 	index *atomic.Pointer[core.Index]
-	cfg   core.Config
+	// cfg is shared with the settings form: an edit plus a rebuild is all it
+	// takes to pick up a new folder, scope or manual app.
+	cfg *core.Config
 
 	mu      sync.Mutex
 	running bool
@@ -247,6 +262,11 @@ func (r *rebuilder) rebuild() {
 	r.running = true
 	r.mu.Unlock()
 
+	// Snapshot the options on the caller's thread. rebuild always runs from the
+	// message thread, and the settings form edits the same config there: reading
+	// it from the scan goroutine would race with those edits.
+	opts := snapshotOptions(r.cfg)
+
 	go func() {
 		defer func() {
 			r.mu.Lock()
@@ -258,13 +278,7 @@ func (r *rebuilder) rebuild() {
 		release := win.CoInitialize()
 		defer release()
 
-		rep := sources.Scan(sources.Options{
-			CustomFolders:   r.cfg.CustomFolders,
-			ExcludeFolders:  r.cfg.ExcludeFolders,
-			PathScope:       r.cfg.PathScope,
-			IncludeAppPaths: r.cfg.IncludeAppPaths,
-			ManualApps:      r.cfg.ManualApps,
-		})
+		rep := sources.Scan(opts)
 		if len(rep.Entries) == 0 {
 			return
 		}
@@ -276,6 +290,18 @@ func (r *rebuilder) rebuild() {
 			fmt.Fprintln(os.Stderr, "cache:", err)
 		}
 	}()
+}
+
+// snapshotOptions copies the scan settings out of the live config, including
+// the slices, so the goroutine owns everything it reads.
+func snapshotOptions(cfg *core.Config) sources.Options {
+	return sources.Options{
+		CustomFolders:   append([]string(nil), cfg.CustomFolders...),
+		ExcludeFolders:  append([]string(nil), cfg.ExcludeFolders...),
+		PathScope:       cfg.PathScope,
+		IncludeAppPaths: cfg.IncludeAppPaths,
+		ManualApps:      append([]core.ManualApp(nil), cfg.ManualApps...),
+	}
 }
 
 func launch(entry core.Entry, mode ui.Mode) error {
@@ -371,22 +397,75 @@ func wantsDump(args []string) bool {
 	return false
 }
 
-// drawSettings paints the read-only scaffold of the settings window.
-func drawSettings(c *win.Canvas, fonts *win.Fonts, cfg core.Config) {
-	c.Fill(win.Rect{Left: 0, Top: 0, Right: 4000, Bottom: 4000}, ui.ColorBackground)
-	c.UseFont(fonts.Query)
-	c.Text("Settings", 24, 18, 0xF1ECEC)
-	c.UseFont(fonts.Row)
-	lines := []string{
-		fmt.Sprintf("Hotkey:         %s", cfg.Hotkey),
-		fmt.Sprintf("Max results:    %d", cfg.MaxResults),
-		fmt.Sprintf("Backdrop:       %s", cfg.Backdrop),
-		fmt.Sprintf("PATH scope:     %s", cfg.PathScope),
-		fmt.Sprintf("Custom folders: %d", len(cfg.CustomFolders)),
-		fmt.Sprintf("Manual apps:    %d", len(cfg.ManualApps)),
-		fmt.Sprintf("Autostart:      %v", cfg.Autostart),
+// applyBackdrop switches the launcher window between the two backdrops without
+// recreating it. Acrylic needs WS_EX_LAYERED and the undocumented accent policy;
+// solid disables both and leaves the painted content on its own.
+func applyBackdrop(hwnd uintptr, mode string, dpi int32) error {
+	if mode == core.BackdropAcrylic {
+		if err := win.SetLayered(hwnd, true); err != nil {
+			return err
+		}
+		// AABBGGRR: dark tint at 91% alpha. The tint is what controls how much
+		// of the blurred desktop reaches the eye; the paint stays opaque.
+		if err := win.EnableAcrylic(hwnd, 0xE8161212, 255); err != nil {
+			return err
+		}
+		return win.RoundCorners(hwnd, 10*dpi/96)
 	}
-	for i, line := range lines {
-		c.Text(line, 24, 64+int32(i)*26, 0xD6D6DE)
+
+	win.DisableAcrylic(hwnd)
+	if err := win.SetLayered(hwnd, false); err != nil {
+		return err
+	}
+	debugf("backdrop solid")
+	return nil
+}
+
+// hotkeyBinding owns the single global hotkey id and remembers whether it is
+// registered, so the settings window can release it while recording a
+// combination and put it back afterwards.
+type hotkeyBinding struct {
+	shell      *win.Window
+	text       string // last combination that registered successfully
+	registered bool
+}
+
+// apply installs text as the global hotkey, replacing whatever was registered.
+func (h *hotkeyBinding) apply(text string) error {
+	h.release()
+
+	hk, err := win.ParseHotkey(text)
+	if err != nil {
+		return err
+	}
+	if err := h.shell.RegisterHotkey(hk); err != nil {
+		return err
+	}
+	h.registered = true
+	h.text = text
+	return nil
+}
+
+// release frees the combination without touching the config.
+func (h *hotkeyBinding) release() {
+	if h.registered {
+		_ = h.shell.UnregisterHotkey()
+		h.registered = false
+	}
+}
+
+// lock is the settings hook: capturing releases the hotkey so the keystroke
+// reaches the window, and leaving capture registers it again. text keeps the
+// last combination that worked, so a rejected edit restores the previous one.
+func (h *hotkeyBinding) lock(capturing bool) {
+	if capturing {
+		h.release()
+		return
+	}
+	if h.registered {
+		return
+	}
+	if err := h.apply(h.text); err != nil {
+		debugf("hotkey restore: %v", err)
 	}
 }

@@ -3,11 +3,22 @@ package ui
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"applauncher/internal/core"
 	"applauncher/internal/win"
 )
+
+// settingsKey marks the synthetic row that opens the settings window. It never
+// enters the index: the launcher injects it while the query asks for it.
+const settingsKey = "app:settings"
+
+// settingsAliases are the words that surface that row.
+var settingsAliases = []string{"settings", "config", "ajustes", "preferences"}
+
+// settingsMinQuery is the shortest query that surfaces the row.
+const settingsMinQuery = 3
 
 // Mode is what Enter does to the selected row.
 type Mode int
@@ -44,6 +55,7 @@ type App struct {
 	caretOn  bool
 	status   string
 	rebuild  func()
+	open     func() // opens the settings window
 	timers   map[uintptr]func()
 }
 
@@ -85,6 +97,17 @@ func (a *App) Attach() {
 // SetSize informs the app of the client area, so the layout can be computed.
 func (a *App) SetSize(width, height int32) {
 	a.width, a.height = width, height
+}
+
+// SetMaxResults changes how many rows the list shows. It is the live half of the
+// settings window: the next reflow uses the new limit immediately.
+func (a *App) SetMaxResults(n int) {
+	if n <= 0 || n == a.config.MaxResults {
+		return
+	}
+	a.config.MaxResults = n
+	a.refresh()
+	a.window.Invalidate()
 }
 
 // Visible reports whether the launcher is on screen.
@@ -143,17 +166,48 @@ func (a *App) refresh() {
 		a.results = nil
 		return
 	}
-	a.results = idx.Search(core.Query{
-		Text:    string(a.query),
+
+	query := string(a.query)
+	results := idx.Search(core.Query{
+		Text:    query,
 		Limit:   a.config.MaxResults,
 		History: a.history,
 	})
+
+	// The settings window is reachable by typing its name, the way every other
+	// row is reachable: one list, one keyboard model, no hidden menu.
+	if a.open != nil && wantsSettings(query) {
+		row := core.Result{Entry: core.Entry{Name: "Settings", Key: settingsKey}, Score: 1}
+		results = append([]core.Result{row}, results...)
+		if len(results) > a.config.MaxResults {
+			results = results[:a.config.MaxResults]
+		}
+	}
+	a.results = results
+
 	if a.selected >= len(a.results) {
 		a.selected = len(a.results) - 1
 	}
 	if a.selected < 0 {
 		a.selected = 0
 	}
+}
+
+// wantsSettings reports whether the query is asking for the settings window. A
+// prefix match keeps it predictable: "sett" and "con" work, "xyz" does not.
+func wantsSettings(query string) bool {
+	query = strings.ToLower(strings.TrimSpace(query))
+	// Shorter queries would shadow every application starting with the same
+	// letters, which is exactly what a launcher must not do.
+	if len(query) < settingsMinQuery {
+		return false
+	}
+	for _, alias := range settingsAliases {
+		if strings.HasPrefix(alias, query) {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *App) onChar(r rune) {
@@ -228,7 +282,11 @@ func (a *App) onKey(k win.KeyEvent) bool {
 }
 
 // SetRebuildHandler installs the callback behind F5 and the tray menu.
+// SetRebuildHandler installs the callback behind F5.
 func (a *App) SetRebuildHandler(fn func()) { a.rebuild = fn }
+
+// SetSettingsHandler installs what the synthetic Settings row opens.
+func (a *App) SetSettingsHandler(fn func()) { a.open = fn }
 
 // SetStatus replaces the footer hint until the next query change.
 func (a *App) SetStatus(s string) {
@@ -252,6 +310,14 @@ func (a *App) activate(k win.KeyEvent) {
 	}
 
 	entry := a.results[a.selected].Entry
+	if entry.Key == settingsKey {
+		a.Hide()
+		if a.open != nil {
+			a.open()
+		}
+		return
+	}
+
 	if a.launch != nil {
 		if err := a.launch(entry, mode); err != nil {
 			// Keep the window open so the failure is visible.

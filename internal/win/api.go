@@ -167,6 +167,9 @@ var (
 	procTextOutW            = gdi32.NewProc("TextOutW")
 	procGetTextExtentPointW = gdi32.NewProc("GetTextExtentPoint32W")
 	procGetStockObject      = gdi32.NewProc("GetStockObject")
+	procSaveDC              = gdi32.NewProc("SaveDC")
+	procRestoreDC           = gdi32.NewProc("RestoreDC")
+	procIntersectClipRect   = gdi32.NewProc("IntersectClipRect")
 )
 
 // Additional constants used by the shell and painting code.

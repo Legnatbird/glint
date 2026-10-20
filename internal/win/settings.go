@@ -10,41 +10,102 @@ import (
 
 const settingsClassName = "AppLauncherSettings"
 
+const (
+	wmSize       = 0x0005
+	wmSysKeyDown = 0x0104
+	wmMouseWheel = 0x020A
+
+	csHDraw = 0x0002
+	csVDraw = 0x0001
+)
+
 var (
 	settingsWindow *SettingsWindow
 	settingsProc   = syscall.NewCallback(settingsWndProc)
 )
 
 // SettingsWindow is an ordinary captioned window, separate from the launcher.
+//
+// It has no child controls: the form paints itself and reads the keyboard
+// directly, which keeps one painting model in the program and costs no extra
+// window handles per control.
 type SettingsWindow struct {
 	hwnd    uintptr
 	visible bool
+
 	onPaint func(*Canvas)
-	clsDone bool
-	clsErr  error
+	onKey   func(KeyEvent) bool
+	onChar  func(rune)
+	onClick func(x, y int32)
+	onWheel func(delta int32)
+	onBlur  func()
+	onClose func()
 }
 
 func settingsWndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
+	w := settingsWindow
 	switch uint32(msg) {
 	case wmPaint:
 		var ps paintStruct
 		hdc, _, _ := procBeginPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
-		if settingsWindow != nil && settingsWindow.onPaint != nil && hdc != 0 {
-			settingsWindow.onPaint(&Canvas{hdc: hdc})
+		if w != nil && w.onPaint != nil && hdc != 0 {
+			w.onPaint(&Canvas{hdc: hdc})
 		}
 		procEndPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
 		return 0
 
 	case wmClose:
-		procShowWindow.Call(hwnd, swHide)
-		if settingsWindow != nil {
-			settingsWindow.visible = false
+		if w != nil {
+			w.Hide()
+			if w.onClose != nil {
+				w.onClose()
+			}
 		}
 		return 0
+
+	case wmSize:
+		// Mark the client dirty and let the next paint pass run: forcing an
+		// update here would repaint inside every mouse move of a resize drag.
+		procInvalidateRect.Call(hwnd, 0, 0)
+		return 0
+
+	case wmActivate:
+		if uint32(wParam) == 0 && w != nil && w.onBlur != nil {
+			w.onBlur()
+		}
+
+	case wmKeyDown, wmSysKeyDown:
+		// Alt combinations arrive as WM_SYSKEYDOWN, which is exactly how a
+		// hotkey such as ctrl+alt+space is typed.
+		if w != nil && w.onKey != nil && w.onKey(currentKeyEvent(wParam)) {
+			return 0
+		}
+
+	case wmChar:
+		if w != nil && w.onChar != nil {
+			w.onChar(rune(wParam))
+			return 0
+		}
+
+	case wmMouseWheel:
+		if w != nil && w.onWheel != nil {
+			// The delta is a signed multiple of WHEEL_DELTA (120) in the high word.
+			w.onWheel(int32(int16(uint16(wParam >> 16))))
+			return 0
+		}
+
+	case wmLButtonUp:
+		if w != nil && w.onClick != nil {
+			w.onClick(loword(lParam), hiword(lParam))
+			return 0
+		}
 	}
 	ret, _, _ := procDefWindowProcW.Call(hwnd, msg, wParam, lParam)
 	return ret
 }
+
+func loword(v uintptr) int32 { return int32(int16(uint16(v & 0xFFFF))) }
+func hiword(v uintptr) int32 { return int32(int16(uint16((v >> 16) & 0xFFFF))) }
 
 // NewSettingsWindow creates the hidden settings window.
 func NewSettingsWindow(title string, width, height int32) (*SettingsWindow, error) {
@@ -60,6 +121,7 @@ func NewSettingsWindow(title string, width, height int32) (*SettingsWindow, erro
 	cursor, _, _ := procLoadCursorW.Call(0, idcArrow)
 	brush, _, _ := procCreateSolidBrush.Call(uintptr(0x1F1A1A))
 	wc := wndClassEx{
+		style:         csHDraw | csVDraw,
 		lpfnWndProc:   settingsProc,
 		hInstance:     windows.Handle(hinst),
 		hCursor:       windows.Handle(cursor),
@@ -88,11 +150,11 @@ func NewSettingsWindow(title string, width, height int32) (*SettingsWindow, erro
 	return w, nil
 }
 
-// Show brings the window to the front.
+// Show brings the window to the front and gives it the keyboard.
 func (w *SettingsWindow) Show() {
 	w.visible = true
 	procShowWindow.Call(w.hwnd, swShow)
-	procSetForegroundWindow.Call(w.hwnd)
+	forceForeground(w.hwnd)
 }
 
 // Hide dismisses it without destroying it.
@@ -101,8 +163,49 @@ func (w *SettingsWindow) Hide() {
 	procShowWindow.Call(w.hwnd, swHide)
 }
 
-// OnPaint installs the paint callback.
+// Invalidate marks the whole client area for repaint.
+func (w *SettingsWindow) Invalidate() {
+	procInvalidateRect.Call(w.hwnd, 0, 0)
+	procUpdateWindow.Call(w.hwnd)
+}
+
+// ClientSize reports the client area in pixels.
+func (w *SettingsWindow) ClientSize() (int32, int32) {
+	var r nativeRect
+	procGetClientRect.Call(w.hwnd, uintptr(unsafe.Pointer(&r)))
+	return r.right - r.left, r.bottom - r.top
+}
+
+// DPI returns the window's dots per inch (96 at 100% scaling).
+func (w *SettingsWindow) DPI() uint32 {
+	dpi, _, _ := procGetDpiForWindow.Call(w.hwnd)
+	if dpi == 0 {
+		return 96
+	}
+	return uint32(dpi)
+}
+
+// OnPaint installs the paint callback. The canvas is only valid during the call.
 func (w *SettingsWindow) OnPaint(fn func(*Canvas)) { w.onPaint = fn }
+
+// OnKey installs the WM_KEYDOWN/WM_SYSKEYDOWN handler. Returning true marks the
+// key as handled.
+func (w *SettingsWindow) OnKey(fn func(KeyEvent) bool) { w.onKey = fn }
+
+// OnChar installs the WM_CHAR handler.
+func (w *SettingsWindow) OnChar(fn func(rune)) { w.onChar = fn }
+
+// OnClick installs the left-button-up handler, in client coordinates.
+func (w *SettingsWindow) OnClick(fn func(x, y int32)) { w.onClick = fn }
+
+// OnWheel installs the mouse-wheel handler with the raw delta (multiples of 120).
+func (w *SettingsWindow) OnWheel(fn func(delta int32)) { w.onWheel = fn }
+
+// OnBlur runs when the window loses the foreground.
+func (w *SettingsWindow) OnBlur(fn func()) { w.onBlur = fn }
+
+// OnClose runs after the window hides itself.
+func (w *SettingsWindow) OnClose(fn func()) { w.onClose = fn }
 
 // HWND exposes the handle for logging and tests.
 func (w *SettingsWindow) HWND() uintptr { return w.hwnd }

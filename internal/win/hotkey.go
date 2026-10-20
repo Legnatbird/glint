@@ -33,6 +33,68 @@ var keyCodes = func() map[string]uint32 {
 	return m
 }()
 
+// keyNames is the inverse of keyCodes, used to render a captured key press.
+var keyNames = func() map[uint32]string {
+	m := make(map[uint32]string, len(keyCodes))
+	for name, vk := range keyCodes {
+		m[vk] = name
+	}
+	return m
+}()
+
+// Modifier virtual-key codes. The left/right variants are listed because
+// GetKeyState reports those while a combination is being typed.
+const (
+	vkLShift   = 0xA0
+	vkRShift   = 0xA1
+	vkLControl = 0xA2
+	vkRControl = 0xA3
+	vkLMenu    = 0xA4
+	vkRMenu    = 0xA5
+	vkLWin     = 0x5B
+	vkRWin     = 0x5C
+)
+
+// IsModifierKey reports whether vk is a key that cannot end a combination.
+func IsModifierKey(vk uint32) bool {
+	switch vk {
+	case vkShift, vkControl, vkMenu, vkLShift, vkRShift, vkLControl, vkRControl,
+		vkLMenu, vkRMenu, vkLWin, vkRWin:
+		return true
+	}
+	return false
+}
+
+// HotkeyFor describes one key press as a hotkey. ok is false while the press is
+// still incomplete: a modifier on its own, an unnamed key, or a bare key with no
+// modifier held.
+func HotkeyFor(ctrl, alt, shift bool, vk uint32) (Hotkey, bool) {
+	name, named := keyNames[vk]
+	if !named || IsModifierKey(vk) {
+		return Hotkey{}, false
+	}
+
+	var mods uint32
+	parts := make([]string, 0, 3)
+	if ctrl {
+		mods |= modControl
+		parts = append(parts, "ctrl")
+	}
+	if alt {
+		mods |= modAlt
+		parts = append(parts, "alt")
+	}
+	if shift {
+		mods |= modShift
+		parts = append(parts, "shift")
+	}
+	if mods == 0 {
+		return Hotkey{}, false
+	}
+	parts = append(parts, name)
+	return Hotkey{Mods: mods, VK: vk, Text: strings.Join(parts, "+")}, true
+}
+
 // ParseHotkey turns "ctrl+alt+space" into modifiers and a virtual-key code.
 func ParseHotkey(s string) (Hotkey, error) {
 	var mods, vk uint32

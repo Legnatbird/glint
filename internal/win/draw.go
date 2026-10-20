@@ -61,6 +61,21 @@ func (c *Canvas) Fill(r Rect, bgr uint32) {
 	procDeleteObject.Call(brush)
 }
 
+// Clip intersects the current clip region with r and returns a function that
+// restores the previous region. Callers use it to keep a scrolling list from
+// painting over the header and footer.
+func (c *Canvas) Clip(r Rect) func() {
+	saved, _, _ := procSaveDC.Call(c.hdc)
+	if saved == 0 {
+		return func() {}
+	}
+	rect := nativeRect{r.Left, r.Top, r.Right, r.Bottom}
+	procIntersectClipRect.Call(c.hdc,
+		uintptr(rect.left), uintptr(rect.top),
+		uintptr(rect.right), uintptr(rect.bottom))
+	return func() { procRestoreDC.Call(c.hdc, saved) }
+}
+
 // UseFont selects font for the following text calls.
 func (c *Canvas) UseFont(font uintptr) {
 	if font != 0 {

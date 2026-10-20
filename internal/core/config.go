@@ -147,7 +147,9 @@ func (c *Config) Normalize() {
 		c.PathScope = defaults.PathScope
 	}
 
-	clean := c.ManualApps[:0]
+	// A fresh slice, never ManualApps[:0]: the old array may be shared with a
+	// scan that is still running.
+	clean := make([]ManualApp, 0, len(c.ManualApps))
 	for _, app := range c.ManualApps {
 		app.Name = strings.TrimSpace(app.Name)
 		app.Target = strings.TrimSpace(app.Target)

@@ -111,6 +111,17 @@ func (h *History) Len() int {
 	return len(h.recs)
 }
 
+// Clear forgets every recorded launch. The caller is responsible for persisting
+// the now-empty history.
+func (h *History) Clear() {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.recs = make(map[string]Record)
+}
+
 func (h *History) pruneLocked() {
 	keys := make([]string, 0, len(h.recs))
 	for k := range h.recs {
