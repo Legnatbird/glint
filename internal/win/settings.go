@@ -35,8 +35,6 @@ func settingsWndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 		procEndPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
 		return 0
 
-	case wmEraseBkgnd:
-		return 1
 	case wmClose:
 		procShowWindow.Call(hwnd, swHide)
 		if settingsWindow != nil {
