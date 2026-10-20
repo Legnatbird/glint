@@ -143,5 +143,11 @@ docs/plan.md      product and engineering plan
 
 The mark (a rounded accent panel with a white chevron) is drawn in code, once, in
 `internal/art`. The tray, the settings row, the settings title bar and the
-executable's own shell icon all come from that one buffer — see
+executable's own icon all come from that one buffer — see
 [assets/README.md](assets/README.md) for how the `.ico` is generated and embedded.
+
+Row icons come from the shell (`SHGetFileInfoW` for files, `IShellItemImageFactory`
+for packaged apps) and are drawn at 89% of their 28 px slot. The inset is not
+decoration: packaged-app logos are trimmed so they fill the box, and artwork that
+is not square — Terminal and PowerShell ship 4:3 tiles — runs edge to edge at full
+size and then reads as stretched next to the square logos of the same list.

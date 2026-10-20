@@ -134,10 +134,23 @@ func (a *App) paintResults(c *win.Canvas, l layout) {
 	}
 }
 
+// The icon slot, and how much of it a logo may fill.
+//
+// The slot is the square the row reserves; the logo is drawn a little smaller
+// inside it. Windows keeps that margin around every app logo, and here it also
+// does optical work: a logo that is not square — Terminal and PowerShell ship
+// 4:3 tiles — gets scaled to the slot's width, so filling it edge to edge makes
+// the tile read as stretched next to the square logos in the same list.
+const (
+	iconSlot = 28 // reserved square, in logical pixels
+	iconFill = 25 // drawn logo, about 89% of the slot
+)
+
 // paintRow draws one result: icon, then the name with the matched runes in the
 // accent color. y is the top of the row, not of the text.
 func (a *App) paintRow(c *win.Canvas, r core.Result, y int32, l layout, selected bool) {
-	iconSize := a.scale(28)
+	slot := a.scale(iconSlot)
+	fill := a.scale(iconFill)
 	iconGap := a.scale(14)
 
 	// Icons decoded from the shell carry alpha, so they need the colour behind
@@ -147,9 +160,10 @@ func (a *App) paintRow(c *win.Canvas, r core.Result, y int32, l layout, selected
 		background = colorSelection
 	}
 	icon := a.icons.get(r.Entry.IconPath)
-	icon.Draw(c, l.pad, y+(l.rowH-iconSize)/2, iconSize, background)
+	icon.Draw(c, l.pad+(slot-fill)/2, y+(l.rowH-fill)/2, fill, background)
 
-	x := l.pad + iconSize + iconGap
+	// The text stays where the slot ends, so the inset never moves the column.
+	x := l.pad + slot + iconGap
 	textY := y + (l.rowH-c.LineHeight())/2
 
 	name := []rune(r.Entry.Name)
