@@ -98,11 +98,10 @@ func (p *iconPixels) composite(out []byte, dst int, bg uint32) {
 			sx := (float64(dx)+0.5)*scale - 0.5
 			sample := sampleBilinear(p.bgra, p.size, sx, sy)
 
-			// RGB is pre-blended over the row colour, which is what a solid
-			// window blits. The alpha channel is carried through unchanged: on
-			// the layered (acrylic) window GDI paint lands at partial opacity and
-			// DWM composites per pixel, so an opaque margin would punch a square
-			// hole in the row and read as a box around the icon.
+			// RGB is pre-blended over the row colour, which is what an opaque
+			// window blits. The alpha byte is carried through anyway: it costs
+			// nothing and keeps the buffer meaningful if it is ever drawn on a
+			// composited surface.
 			a := sample[3] / 255
 			offset := (dy*dst + dx) * 4
 			out[offset+0] = clampByte(sample[0]*a + float64(bgB)*(1-a))

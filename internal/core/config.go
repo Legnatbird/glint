@@ -15,12 +15,6 @@ type HistoryConfig struct {
 	MaxEntries int  `json:"max_entries"`
 }
 
-// Backdrop modes.
-const (
-	BackdropSolid   = "solid"
-	BackdropAcrylic = "acrylic"
-)
-
 // ManualApp is an application the user adds by hand, for anything no source
 // can discover: launcher-managed games, portable tools, script wrappers.
 type ManualApp struct {
@@ -40,11 +34,11 @@ const (
 // Config is the portable configuration file. It lives next to the executable so
 // the whole app is a folder that can be copied or deleted.
 type Config struct {
-	Hotkey          string        `json:"hotkey"`
-	MaxResults      int           `json:"max_results"`
-	Theme           string        `json:"theme"`
-	PathScope       string        `json:"path_scope"`
-	Backdrop        string        `json:"backdrop"`
+	Hotkey     string `json:"hotkey"`
+	MaxResults int    `json:"max_results"`
+	Theme      string `json:"theme"`
+	PathScope  string `json:"path_scope"`
+
 	Autostart       bool          `json:"autostart"`
 	CustomFolders   []string      `json:"custom_folders"`
 	ExcludeFolders  []string      `json:"exclude_folders"`
@@ -56,14 +50,10 @@ type Config struct {
 // DefaultConfig is also the fallback for every invalid field.
 func DefaultConfig() Config {
 	return Config{
-		Hotkey:     "ctrl+alt+space",
-		MaxResults: 8,
-		Theme:      "dark",
-		PathScope:  PathGUI,
-		// Solid, not acrylic: on Windows 10 the accent policy paints the whole
-		// window rectangle and is not clipped by the rounded region, so acrylic
-		// costs the corners. It stays available as an option.
-		Backdrop:        BackdropSolid,
+		Hotkey:          "ctrl+alt+space",
+		MaxResults:      8,
+		Theme:           "dark",
+		PathScope:       PathGUI,
 		IncludeAppPaths: true, History: HistoryConfig{Enabled: true, MaxEntries: 2000},
 	}
 }
@@ -136,12 +126,6 @@ func (c *Config) Normalize() {
 	case "dark", "light", "system":
 	default:
 		c.Theme = defaults.Theme
-	}
-
-	switch c.Backdrop {
-	case BackdropSolid, BackdropAcrylic:
-	default:
-		c.Backdrop = defaults.Backdrop
 	}
 
 	switch c.PathScope {

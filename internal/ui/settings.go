@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"errors"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -9,10 +8,6 @@ import (
 	"applauncher/internal/core"
 	"applauncher/internal/win"
 )
-
-// ErrCancelled is what a hook returns when the user backed out of a change. The
-// form puts the old value back and says so neutrally, because nothing failed.
-var ErrCancelled = errors.New("ui: change cancelled")
 
 // Settings is the form that lives inside the settings window.
 //
@@ -48,7 +43,7 @@ type SettingsHooks struct {
 	Save       func() error            // persist config.json
 	Hotkey     func(text string) error // install a new global hotkey
 	HotkeyLock func(capturing bool)    // release/reclaim the hotkey while capturing
-	Backdrop   func(mode string) error // switch the launcher backdrop live
+
 	Autostart  func(enabled bool) error
 	MaxResults func(n int)
 	Rescan     func() // rebuild the index after a source change
@@ -162,7 +157,7 @@ func (s *Settings) build() ([]row, int32) {
 	}
 	add(rowHotkey, "Hotkey", hotkey, nil, s.beginCapture)
 	add(rowNumber, "Max results", strconv.Itoa(s.cfg.MaxResults), s.stepMaxResults, nil)
-	add(rowChoice, "Backdrop", s.cfg.Backdrop, s.stepBackdrop, nil)
+
 	add(rowToggle, "Start with Windows", onOff(s.cfg.Autostart), nil, s.toggleAutostart)
 
 	header("Sources")
@@ -619,31 +614,6 @@ func (s *Settings) stepMaxResults(delta int) {
 	s.cfg.MaxResults = n
 	if s.hooks.MaxResults != nil {
 		s.hooks.MaxResults(n)
-	}
-	s.commit()
-}
-
-func (s *Settings) stepBackdrop(delta int) {
-	order := []string{core.BackdropSolid, core.BackdropAcrylic}
-	current := 0
-	if s.cfg.Backdrop == core.BackdropAcrylic {
-		current = 1
-	}
-	next := order[(current+delta+len(order))%len(order)]
-	if next == s.cfg.Backdrop {
-		return
-	}
-
-	previous := s.cfg.Backdrop
-	s.cfg.Backdrop = next
-	if err := s.hooks.Backdrop(next); err != nil {
-		s.cfg.Backdrop = previous
-		if errors.Is(err, ErrCancelled) {
-			s.setStatus("Backdrop unchanged", false)
-			return
-		}
-		s.setError("Cannot switch backdrop: " + err.Error())
-		return
 	}
 	s.commit()
 }

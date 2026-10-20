@@ -52,8 +52,7 @@ func TestCompositeOverBackground(t *testing.T) {
 			t.Errorf("%s: got bgra(%d,%d,%d), want (%d,%d,%d)",
 				tc.name, out[centre+0], out[centre+1], out[centre+2], tc.wantB, tc.wantG, tc.wantR)
 		}
-		// The alpha channel rides along so a layered window composites the icon
-		// over the same backdrop as the row instead of punching a hole in it.
+		// The alpha channel rides along with the pre-blended colour.
 		if out[centre+3] != tc.wantA {
 			t.Errorf("%s: output alpha = %d, want %d", tc.name, out[centre+3], tc.wantA)
 		}

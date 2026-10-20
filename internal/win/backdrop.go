@@ -5,122 +5,16 @@ import (
 	"unsafe"
 )
 
-// Acrylic backdrop and rounded corners.
+// Rounded corners.
 //
-// On Windows 10 the acrylic material is reachable through
-// SetWindowCompositionAttribute, an API Microsoft never documented and has
-// changed between releases. Two details decide whether it is visible at all:
+// Windows 11 can round a window through DWM, with antialiasing. Windows 10 has no
+// such attribute, so the window is clipped to a region and the arc is a staircase
+// of whole pixels — which is why the painted border follows the same arc instead
+// of cutting across the corner.
 //
-//   - the window must be layered, so the desktop (and the blurred backdrop DWM
-//     renders behind it) composites with the content instead of being covered;
-//   - the tint is carried by the accent policy, not by the painted background,
-//     which stays opaque and dark.
-//
-// If any call fails the launcher keeps its solid background: this is polish,
-// never a startup dependency.
-
-const (
-	wcaAccentPolicy = 19
-
-	accentDisabled         = 0
-	accentEnableBlurBehind = 3
-	accentEnableAcrylic    = 4
-
-	lwaAlpha = 0x00000002
-)
-
-type accentPolicy struct {
-	state         uint32
-	flags         uint32
-	gradientColor uint32
-	animationID   uint32
-}
-
-type windowCompositionAttributeData struct {
-	attribute  uint32
-	data       unsafe.Pointer
-	sizeOfData uint32
-}
-
-var (
-	procSetWindowCompositionAttribute = user32.NewProc("SetWindowCompositionAttribute")
-	procSetLayeredWindowAttributes    = user32.NewProc("SetLayeredWindowAttributes")
-	procCreateRoundRectRgn            = gdi32.NewProc("CreateRoundRectRgn")
-	procSetWindowRgn                  = user32.NewProc("SetWindowRgn")
-	procGetWindowLongPtrW             = user32.NewProc("GetWindowLongPtrW")
-	procSetWindowLongPtrW             = user32.NewProc("SetWindowLongPtrW")
-)
-
-// GWL_EXSTYLE as an unsigned value: -20 in two's complement, because a negative
-// constant cannot be converted to uintptr directly.
-const gwlExStyle = ^uintptr(19)
-
-// SetLayered toggles WS_EX_LAYERED on a window that already exists. Acrylic
-// needs it, and switching the backdrop at runtime needs it applied after the
-// fact: the style cannot be changed from outside the creation call.
-func SetLayered(hwnd uintptr, on bool) error {
-	ex, _, _ := procGetWindowLongPtrW.Call(hwnd, gwlExStyle)
-	if on {
-		ex |= wsExLayered
-	} else {
-		ex &^= wsExLayered
-	}
-	procSetWindowLongPtrW.Call(hwnd, gwlExStyle, ex)
-
-	got, _, _ := procGetWindowLongPtrW.Call(hwnd, gwlExStyle)
-	if layered := got&wsExLayered != 0; layered != on {
-		return fmt.Errorf("win: SetWindowLongPtrW(GWL_EXSTYLE) did not stick")
-	}
-
-	// The style change only takes effect on the next frame pass. Without this the
-	// window keeps its old composition and a window that just became layered
-	// renders as a fully transparent rectangle.
-	procSetWindowPos.Call(hwnd, 0, 0, 0, 0, 0,
-		swpNoMove|swpNoSize|swpNoZOrder|swpNoActivate|swpFrameChanged)
-	return nil
-}
-
-// EnableAcrylic applies the acrylic tint and the global opacity that lets it
-// show through the painted content. tint is AABBGGRR.
-func EnableAcrylic(hwnd uintptr, tint uint32, opacity byte) error {
-	if ok, _, _ := procSetLayeredWindowAttributes.Call(hwnd, 0, uintptr(opacity), lwaAlpha); ok == 0 {
-		return fmt.Errorf("win: SetLayeredWindowAttributes failed")
-	}
-
-	policy := accentPolicy{
-		state:         accentEnableAcrylic,
-		gradientColor: tint,
-	}
-	data := windowCompositionAttributeData{
-		attribute:  wcaAccentPolicy,
-		data:       unsafe.Pointer(&policy),
-		sizeOfData: uint32(unsafe.Sizeof(policy)),
-	}
-	if ok, _, err := procSetWindowCompositionAttribute.Call(hwnd, uintptr(unsafe.Pointer(&data))); ok == 0 {
-		return fmt.Errorf("win: SetWindowCompositionAttribute failed: %w", err)
-	}
-	return nil
-}
-
-// DisableAcrylic restores an opaque window.
-func DisableAcrylic(hwnd uintptr) {
-	policy := accentPolicy{state: accentDisabled}
-	data := windowCompositionAttributeData{
-		attribute:  wcaAccentPolicy,
-		data:       unsafe.Pointer(&policy),
-		sizeOfData: uint32(unsafe.Sizeof(policy)),
-	}
-	procSetWindowCompositionAttribute.Call(hwnd, uintptr(unsafe.Pointer(&data)))
-	procSetLayeredWindowAttributes.Call(hwnd, 0, 255, lwaAlpha)
-}
-
-// Round corners, two ways.
-//
-// A window region clips the window to a rounded rectangle, but the clip is
-// binary: the arc is a staircase of full pixels, which at a small radius reads as
-// a diagonal chamfer rather than a corner. Windows 11 can round a window through
-// DWM instead, with antialiasing, so that is tried first and the region stays as
-// the fallback for Windows 10.
+// The window is opaque: a translucent backdrop was removed because the accent
+// policy that provided it paints the whole window rectangle and ignores the
+// region, leaving a dark sliver in every corner.
 
 const (
 	dwmwaWindowCornerPreference = 33
@@ -129,7 +23,11 @@ const (
 	CornerRound = 2
 )
 
-var procDwmSetWindowAttribute = dwmapi.NewProc("DwmSetWindowAttribute")
+var (
+	procDwmSetWindowAttribute = dwmapi.NewProc("DwmSetWindowAttribute")
+	procCreateRoundRectRgn    = gdi32.NewProc("CreateRoundRectRgn")
+	procSetWindowRgn          = user32.NewProc("SetWindowRgn")
+)
 
 // RoundCornersDWM asks the compositor to round the window's corners.
 func RoundCornersDWM(hwnd uintptr) error {

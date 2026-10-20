@@ -19,7 +19,6 @@ type harness struct {
 	saved      int
 	hotkeys    []string
 	hotkeyLock []bool
-	backdrops  []string
 	autostart  []bool
 	maxResults []int
 	rescans    int
@@ -35,7 +34,6 @@ func newHarness(t *testing.T) *harness {
 		Save:       func() error { h.saved++; return nil },
 		Hotkey:     func(text string) error { h.hotkeys = append(h.hotkeys, text); return nil },
 		HotkeyLock: func(capturing bool) { h.hotkeyLock = append(h.hotkeyLock, capturing) },
-		Backdrop:   func(mode string) error { h.backdrops = append(h.backdrops, mode); return nil },
 		Autostart:  func(on bool) error { h.autostart = append(h.autostart, on); return nil },
 		MaxResults: func(n int) { h.maxResults = append(h.maxResults, n) },
 		Rescan:     func() { h.rescans++ },
@@ -78,12 +76,12 @@ func TestNavigationSkipsHeaders(t *testing.T) {
 		t.Fatalf("after one down: %q, want Max results", got)
 	}
 
-	// PATH scope follows the SOURCES header, which must be stepped over.
-	h.press(win.KeyDown)
+	// PATH scope follows the SOURCES header, which must be stepped over:
+	// Hotkey, Max results, Start with Windows, then PATH scope.
 	h.press(win.KeyDown)
 	h.press(win.KeyDown)
 	if got := h.selectedLabel(); got != "PATH scope" {
-		t.Fatalf("after four downs: %q, want PATH scope", got)
+		t.Fatalf("after three downs: %q, want PATH scope", got)
 	}
 
 	// The first row is a header, so going up from the first focusable row stays.
@@ -116,38 +114,6 @@ func TestMaxResultsStepsAndClamps(t *testing.T) {
 	}
 	if h.saved == 0 {
 		t.Fatal("no save on a value change")
-	}
-}
-
-func TestBackdropSwitchAppliesLive(t *testing.T) {
-	// The starting point is pinned so the test does not depend on which backdrop
-	// the defaults happen to prefer.
-	h := newHarness(t)
-	h.cfg.Backdrop = core.BackdropAcrylic
-	h.selectRow(t, "Backdrop")
-
-	h.press(win.KeyRight)
-	if h.cfg.Backdrop != core.BackdropSolid {
-		t.Fatalf("backdrop = %q, want solid", h.cfg.Backdrop)
-	}
-	if len(h.backdrops) != 1 || h.backdrops[0] != core.BackdropSolid {
-		t.Fatalf("backdrop hook saw %v, want [solid]", h.backdrops)
-	}
-
-	h.press(win.KeyRight)
-	if h.cfg.Backdrop != core.BackdropAcrylic {
-		t.Fatalf("backdrop = %q, want acrylic", h.cfg.Backdrop)
-	}
-	if len(h.backdrops) != 2 || h.backdrops[1] != core.BackdropAcrylic {
-		t.Fatalf("backdrop hook saw %v, want the switch back to acrylic", h.backdrops)
-	}
-}
-
-// The default has to be the backdrop whose corners we can actually keep clean on
-// Windows 10.
-func TestDefaultBackdropIsSolid(t *testing.T) {
-	if got := core.DefaultConfig().Backdrop; got != core.BackdropSolid {
-		t.Fatalf("default backdrop = %q, want solid", got)
 	}
 }
 
@@ -356,32 +322,5 @@ func TestSettingsRowIsInjectedFirst(t *testing.T) {
 		if r.Entry.Key == settingsKey {
 			t.Fatal("settings row injected for an unrelated query")
 		}
-	}
-}
-
-// A backdrop change needs a restart, so the hook can ask first and decline. That
-// has to look like "nothing happened", not like a failure.
-func TestBackdropChangeCanBeCancelled(t *testing.T) {
-	h := newHarness(t)
-	h.cfg.Backdrop = core.BackdropAcrylic
-	h.selectRow(t, "Backdrop")
-	h.form.hooks.Backdrop = func(string) error { return ErrCancelled }
-
-	h.press(win.KeyRight)
-
-	if h.cfg.Backdrop != core.BackdropAcrylic {
-		t.Fatalf("backdrop = %q, want the previous value", h.cfg.Backdrop)
-	}
-	if h.saved != 0 {
-		t.Fatalf("a cancelled change was saved %d times", h.saved)
-	}
-	if h.form.failed {
-		t.Fatal("a cancellation was reported as an error")
-	}
-	if h.form.status != "Backdrop unchanged" {
-		t.Fatalf("status = %q, want it to say nothing changed", h.form.status)
-	}
-	if len(h.backdrops) != 0 {
-		t.Fatalf("backdrop hook list = %v, want no applied change", h.backdrops)
 	}
 }

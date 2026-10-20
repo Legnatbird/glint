@@ -14,7 +14,7 @@ Plan and living decisions: [docs/plan.md](docs/plan.md).
 - **P2** complete — 217 apps discovered (Start Menu, Store/UWP, App Paths, PATH),
   drawn result list, global hotkey, `.lnk` and UWP launching.
 - **P3** complete — usage history in `history.json`, frecency drives the ranking, tray menu, autostart toggle.
-- **P4** complete — app icons (shell and Store apps), rounded corners, optional acrylic backdrop, the launcher's own icon embedded in the executable.
+- **P4** complete — app icons (shell and Store apps), rounded corners, the launcher's own icon embedded in the executable.
 - **P5** complete — settings window: editable controls that apply live, no restart.
 
 ## Requirements
@@ -58,7 +58,7 @@ One column of rows, keyboard first:
 | Key | Action |
 |---|---|
 | `↑` `↓` `Tab` | Move between rows |
-| `←` `→` | Change a value (`max_results`, backdrop, PATH scope) |
+| `←` `→` | Change a value (`max_results`, PATH scope) |
 | `Enter` `Space` | Activate: record a hotkey, toggle, pick a folder, clear |
 | `Esc` | Close |
 
@@ -68,7 +68,6 @@ Every edit is saved to `config.json` and pushed to the running launcher at once:
 |---|---|
 | Hotkey | The new combination is registered. While recording, the old one is released so the keystroke reaches the window. If Windows refuses the combination, the previous one comes back and the reason shows in the footer. |
 | Max results | The launcher list reflows to the new limit. |
-| Backdrop | The launcher window switches between acrylic and solid in place. |
 | Start with Windows | The `Run` key entry is written or removed. |
 | PATH scope, folders, manual apps | The index rescans in the background through the same single-flight rebuilder the hotkey uses. |
 
@@ -86,7 +85,6 @@ defaults, unknown fields are ignored, and an invalid value never breaks startup.
   "max_results": 8,
   "theme": "dark",
   "path_scope": "gui",
-  "backdrop": "solid",
   "autostart": false,
   "custom_folders": ["D:\\Portables"],
   "exclude_folders": [],
@@ -105,14 +103,10 @@ defaults, unknown fields are ignored, and an invalid value never breaks startup.
 
 Windows system folders and the `WindowsApps` alias stubs are always skipped.
 
-`backdrop` is `"solid"` (default) or `"acrylic"`. Acrylic goes through
-`SetWindowCompositionAttribute`, an API Microsoft never documented; if the call
-fails the launcher silently keeps the solid background.
-
-Solid is the default on purpose. The accent paints the whole window rectangle and
-is not clipped by the rounded region, so on Windows 10 acrylic shows as a dark
-sliver in the four corners. Windows 11 rounds the window through DWM and does not
-have that problem.
+The window is opaque. A translucent backdrop was tried and removed: the accent
+policy Windows 10 uses for it paints the whole window rectangle and is not clipped
+by the rounded region, so every corner kept a dark sliver. Opaque plus a proper
+rounded clip looks better than translucent with broken corners.
 
 ## Inspect what it found
 

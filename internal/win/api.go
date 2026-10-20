@@ -54,7 +54,6 @@ const (
 
 	wsExToolWindow     = 0x00000080
 	wsExTopmost        = 0x00000008
-	wsExLayered        = 0x00080000
 	wsExAppWindow      = 0x00040000
 	wsOverlappedWindow = 0x00CF0000
 
