@@ -13,11 +13,12 @@ import (
 
 const windowClassName = "AppLauncherShell"
 
-// Config describes the shell window.
+// WindowConfig describes the shell window.
 //
 // Background is a 0x00BBGGRR color used to erase the client area. The launcher
-// paints its own content later; the brush only prevents a white flash.
-type Config struct {
+// paints its own content; the brush only prevents a white flash while the first
+// frame is drawn.
+type WindowConfig struct {
 	Title      string
 	Width      int32
 	Height     int32
@@ -31,15 +32,29 @@ type Config struct {
 type Window struct {
 	hwnd     uintptr
 	threadID uintptr
-	cfg      Config
+	cfg      WindowConfig
 
-	onHotkey func()
-	onTimer  func(id uintptr)
-	onClose  func()
+	onHotkey     func()
+	onTimer      func(id uintptr)
+	onClose      func()
+	onPaint      func(c *Canvas)
+	onChar       func(r rune)
+	onKey        func(key KeyEvent) bool
+	onDeactivate func()
+
+	hiding bool
 
 	paintStart time.Time
 	paintLat   time.Duration
 	painted    bool
+}
+
+// KeyEvent is one keyboard event, with the modifiers that matter to a launcher.
+type KeyEvent struct {
+	VK    uint32
+	Ctrl  bool
+	Shift bool
+	Alt   bool
 }
 
 var (
@@ -53,7 +68,8 @@ var (
 )
 
 func wndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
-	if w := activeWindow; w != nil {
+	w := activeWindow
+	if w != nil {
 		switch uint32(msg) {
 		case wmHotkey:
 			if w.onHotkey != nil {
@@ -71,17 +87,57 @@ func wndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 				w.paintStart = time.Time{}
 				w.painted = true
 			}
+			var ps paintStruct
+			hdc, _, _ := procBeginPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
+			if w.onPaint != nil && hdc != 0 {
+				w.onPaint(&Canvas{hdc: hdc})
+			}
+			procEndPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
+			return 0
+		case wmChar:
+			if w.onChar != nil {
+				w.onChar(rune(wParam))
+			}
+			return 0
+		case wmKeyDown:
+			if w.onKey != nil && w.onKey(currentKeyEvent(wParam)) {
+				return 0
+			}
+		case wmActivate:
+			// WA_INACTIVE. The window is about to lose the foreground: hide it,
+			// the way every launcher dismisses on click-away.
+			if uint32(wParam) == 0 && w.onDeactivate != nil && !w.hiding {
+				w.onDeactivate()
+			}
+			return 0
 		case wmDestroy:
 			if w.onClose != nil {
 				w.onClose()
 			}
+		case wmEraseBkgnd:
+			// Painting is fully handled in WM_PAINT.
+			return 1
 		}
 	}
 	ret, _, _ := procDefWindowProcW.Call(hwnd, msg, wParam, lParam)
 	return ret
 }
 
-func registerClass(cfg Config) error {
+func currentKeyEvent(vk uintptr) KeyEvent {
+	return KeyEvent{
+		VK:    uint32(vk),
+		Ctrl:  keyDown(vkControl),
+		Shift: keyDown(vkShift),
+		Alt:   keyDown(vkMenu),
+	}
+}
+
+func keyDown(vk uintptr) bool {
+	r, _, _ := procGetKeyState.Call(vk)
+	return int16(r) < 0
+}
+
+func registerClass(cfg WindowConfig) error {
 	if classReady {
 		return classErr
 	}
@@ -119,7 +175,7 @@ func registerClass(cfg Config) error {
 
 // NewWindow creates the hidden shell window and locks it to the calling OS
 // thread, which must be the one that later runs the message loop.
-func NewWindow(cfg Config) (*Window, error) {
+func NewWindow(cfg WindowConfig) (*Window, error) {
 	runtime.LockOSThread()
 
 	if err := registerClass(cfg); err != nil {
@@ -193,29 +249,47 @@ func (w *Window) Run() error {
 // Show makes the window visible and foreground, returning how long the two
 // calls took. It is the hot path of the launcher, so it allocates nothing.
 func (w *Window) Show() time.Duration {
+	w.hiding = false
 	w.paintStart = time.Now()
 	w.painted = false
-
 	start := time.Now()
+
 	procShowWindow.Call(w.hwnd, swShow)
-	procSetForegroundWindow.Call(w.hwnd)
+	procSetWindowPos.Call(w.hwnd, hwndTopmost, 0, 0, 0, 0, swpNoMove|swpNoSize|swpShowWindow)
+	forceForeground(w.hwnd)
+
 	return time.Since(start)
 }
 
 // Hide removes the window from the screen without destroying it.
 func (w *Window) Hide() {
+	w.hiding = true
 	procShowWindow.Call(w.hwnd, swHide)
 }
 
-// PaintLatency reports the time between the last Show and its first WM_PAINT.
-func (w *Window) PaintLatency() (time.Duration, bool) {
-	return w.paintLat, w.painted
+// Invalidate marks the whole client area for repaint.
+func (w *Window) Invalidate() {
+	procInvalidateRect.Call(w.hwnd, 0, 0)
+	procUpdateWindow.Call(w.hwnd)
 }
+
+// PaintLatency reports the time between the last Show and its first WM_PAINT.
+func (w *Window) PaintLatency() (time.Duration, bool) { return w.paintLat, w.painted }
 
 // ResetPaint clears the paint measurement before the next Show.
 func (w *Window) ResetPaint() {
 	w.paintLat = 0
 	w.painted = false
+	w.paintStart = time.Time{}
+}
+
+// DPI returns the window's current dots per inch (96 at 100% scaling).
+func (w *Window) DPI() uint32 {
+	dpi, _, _ := procGetDpiForWindow.Call(w.hwnd)
+	if dpi == 0 {
+		return 96
+	}
+	return uint32(dpi)
 }
 
 // SetTimer posts WM_TIMER with the given id after d. Message timers are
@@ -234,7 +308,7 @@ func (w *Window) PostQuit() {
 	procPostThreadMessageW.Call(w.threadID, wmQuit, 0, 0)
 }
 
-// Destroy frees the native window and detaches the packet-level callbacks.
+// Destroy frees the native window and detaches the callbacks.
 func (w *Window) Destroy() {
 	if w.hwnd != 0 {
 		procDestroyWindow.Call(w.hwnd)
@@ -251,3 +325,36 @@ func (w *Window) OnTimer(fn func(id uintptr)) { w.onTimer = fn }
 
 // OnClose sets the WM_DESTROY handler.
 func (w *Window) OnClose(fn func()) { w.onClose = fn }
+
+// OnPaint sets the WM_PAINT handler. The canvas is only valid during the call.
+func (w *Window) OnPaint(fn func(c *Canvas)) { w.onPaint = fn }
+
+// OnChar sets the WM_CHAR handler, which is already IME/dead-key composed.
+func (w *Window) OnChar(fn func(r rune)) { w.onChar = fn }
+
+// OnKey sets the WM_KEYDOWN handler. Returning true marks the key as handled.
+func (w *Window) OnKey(fn func(KeyEvent) bool) { w.onKey = fn }
+
+// OnDeactivate runs when the window loses the foreground.
+func (w *Window) OnDeactivate(fn func()) { w.onDeactivate = fn }
+
+// forceForeground brings the window to the front even when another process owns
+// the foreground. Windows refuses SetForegroundWindow from a background thread;
+// attaching to the foreground thread's input queue lifts that restriction.
+func forceForeground(hwnd uintptr) {
+	fg, _, _ := procGetForegroundWindow.Call()
+	if fg != 0 && fg != hwnd {
+		fgThread, _, _ := procGetWindowThreadPID.Call(fg, 0)
+		curThread, _, _ := procGetCurrentThreadID.Call()
+		if fgThread != 0 && fgThread != curThread {
+			procAttachThreadInput.Call(curThread, fgThread, 1)
+			procBringWindowToTop.Call(hwnd)
+			procSetForegroundWindow.Call(hwnd)
+			procSetFocus.Call(hwnd)
+			procAttachThreadInput.Call(curThread, fgThread, 0)
+			return
+		}
+	}
+	procSetForegroundWindow.Call(hwnd)
+	procSetFocus.Call(hwnd)
+}

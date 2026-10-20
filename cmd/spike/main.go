@@ -57,7 +57,7 @@ func main() {
 	rep.DPI = win.EnableDPIAwareness()
 
 	bootStart := time.Now()
-	shell, err := win.NewWindow(win.Config{
+	shell, err := win.NewWindow(win.WindowConfig{
 		Title:      "app-launcher spike",
 		Width:      640,
 		Height:     420,

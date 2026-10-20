@@ -29,13 +29,14 @@ const (
 
 // Entry is one launchable application.
 type Entry struct {
-	Key      string `json:"key"`               // canonical identity, also the history key
-	Name     string `json:"name"`              // display name
-	Target   string `json:"target,omitempty"`  // .lnk or .exe path
-	AUMID    string `json:"aumid,omitempty"`   // AppUserModelID for Store apps
-	Args     string `json:"args,omitempty"`    // forwarded arguments
-	WorkDir  string `json:"workdir,omitempty"` // working directory
-	IconPath string `json:"icon,omitempty"`    // icon source, may be the target
+	Key      string `json:"key"`                // canonical identity, also the history key
+	Name     string `json:"name"`               // display name
+	Target   string `json:"target,omitempty"`   // what gets executed: .lnk or .exe
+	Resolved string `json:"resolved,omitempty"` // executable behind the shortcut
+	AUMID    string `json:"aumid,omitempty"`    // AppUserModelID for Store apps
+	Args     string `json:"args,omitempty"`     // forwarded arguments
+	WorkDir  string `json:"workdir,omitempty"`  // working directory
+	IconPath string `json:"icon,omitempty"`     // icon source, may be the target
 	Source   Source `json:"source"`
 }
 

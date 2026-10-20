@@ -1,6 +1,6 @@
 # app-launcher — product and engineering plan
 
-Status: **P1 complete** · Updated: 2026-10-20
+Status: **P2 complete** · Updated: 2026-10-20
 
 A Windows-only, keyboard-first launcher that finds and starts applications. It is
 the app-launcher slice of [Wox](https://github.com/Wox-launcher/Wox) rebuilt around
@@ -37,19 +37,21 @@ non-Windows platforms.
 
 ## Resource budget vs measured baseline
 
-| Metric | Budget | Measured (P0) |
+| Metric | Budget | Measured |
 |---|---|---|
-| Idle working set | ≤ 30 MB | **7.7 MB** before first show · **10.8 MB** after two show/hide cycles |
-| Private bytes | ≤ 30 MB | **12.6 MB** |
+| Idle working set, full launcher with 217 apps | ≤ 30 MB | **22.2 MB** hidden · **24.3 MB** visible |
+| Idle working set, bare shell (P0 spike) | — | **7.7 MB** before first show · **10.8 MB** after two show/hide cycles |
+| Private bytes (spike) | ≤ 30 MB | **12.6 MB** |
 | Boot: `main` → hotkey registered | ≤ 120 ms | **2.6 ms** |
 | `Show()` (ShowWindow + SetForegroundWindow) | ≤ 50 ms | **3.2 ms** cold · **< 0.1 ms** warm |
 | First `WM_PAINT` after show | ≤ 50 ms | **2.2 ms** |
+| Full scan of every source | ≤ 300 ms | **68 ms** for 217 apps |
 | Search over 3 000 entries | ≤ 1 ms | **0.11 ms**, 2 KB allocated per query |
-| CPU, whole 6 s run incl. startup and 2 paints | — | **~16 ms total** (0.0 % steady state) |
+| CPU, whole 6 s spike run incl. startup and 2 paints | — | **~16 ms total** (0.0 % steady state) |
 | OS threads | ≤ 12 | **9** |
 | Kernel handles | ≤ 300 | **208** |
 | GDI objects | ≤ 60 | **8** (before icons) |
-| Binary size | ≤ 15 MB | **4.4 MB** |
+| Binary size | ≤ 15 MB | **3.0 MB** |
 | Processes | 1 | **1** |
 | Network connections | 0 | **0** |
 
@@ -163,7 +165,7 @@ what keeps matching and ranking testable without a desktop session.
 |---|---|---|
 | **P0** ✅ | Spike: hidden window, global hotkey, self-measurement | Measured budget met with 3× headroom (see table) |
 | **P1** ✅ | `core`: matcher, ranker, config, cache format | 31 test functions green; 3 000 entries in **0.11 ms** |
-| **P2** | Sources + window + launch | Finds every Start Menu app, launches .lnk and UWP; foreground steal works with a fullscreen app in front |
+| **P2** ✅ | Sources + window + launch | 217 apps found (73 Start Menu, 11 Store, 15 App Paths, 135 PATH); `.lnk` and UWP both launch; hotkey steals the foreground from another app |
 | **P3** | Frecency, tray, autostart, settings JSON | Restart preserves ranking and settings; tray quits cleanly |
 | **P4** | Polish: icons, DPI, theming, packaging | Budget re-measured; 7-day soak under 20 MB with 0 % idle CPU |
 
