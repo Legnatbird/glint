@@ -1,6 +1,6 @@
 # app-launcher — product and engineering plan
 
-Status: **P0 measured** · Updated: 2026-10-20
+Status: **P1 complete** · Updated: 2026-10-20
 
 A Windows-only, keyboard-first launcher that finds and starts applications. It is
 the app-launcher slice of [Wox](https://github.com/Wox-launcher/Wox) rebuilt around
@@ -44,6 +44,7 @@ non-Windows platforms.
 | Boot: `main` → hotkey registered | ≤ 120 ms | **2.6 ms** |
 | `Show()` (ShowWindow + SetForegroundWindow) | ≤ 50 ms | **3.2 ms** cold · **< 0.1 ms** warm |
 | First `WM_PAINT` after show | ≤ 50 ms | **2.2 ms** |
+| Search over 3 000 entries | ≤ 1 ms | **0.11 ms**, 2 KB allocated per query |
 | CPU, whole 6 s run incl. startup and 2 paints | — | **~16 ms total** (0.0 % steady state) |
 | OS threads | ≤ 12 | **9** |
 | Kernel handles | ≤ 300 | **208** |
@@ -161,7 +162,7 @@ what keeps matching and ranking testable without a desktop session.
 | Phase | Deliverable | Exit criteria |
 |---|---|---|
 | **P0** ✅ | Spike: hidden window, global hotkey, self-measurement | Measured budget met with 3× headroom (see table) |
-| **P1** | `core`: matcher, ranker, config, cache format | `go test ./...` green; 3 000 entries in < 1 ms |
+| **P1** ✅ | `core`: matcher, ranker, config, cache format | 31 test functions green; 3 000 entries in **0.11 ms** |
 | **P2** | Sources + window + launch | Finds every Start Menu app, launches .lnk and UWP; foreground steal works with a fullscreen app in front |
 | **P3** | Frecency, tray, autostart, settings JSON | Restart preserves ranking and settings; tray quits cleanly |
 | **P4** | Polish: icons, DPI, theming, packaging | Budget re-measured; 7-day soak under 20 MB with 0 % idle CPU |

@@ -7,9 +7,12 @@ The full product and engineering plan lives in [docs/plan.md](docs/plan.md).
 
 ## Status
 
-Phase **P0** complete: a hidden Win32 window, a global hotkey and an idle message
-loop, measured at **10.8 MB working set**, **2.6 ms boot** and **3.2 ms** from
-hotkey to visible.
+- **P0** complete: a hidden Win32 window, a global hotkey and an idle message
+  loop, measured at **10.8 MB working set**, **2.6 ms boot** and **3.2 ms** from
+  hotkey to visible.
+- **P1** complete: fuzzy matcher, frecency ranker, portable config and index
+  cache in `internal/core`, with no Win32 involved — 3 000 entries ranked in
+  **0.11 ms** allocating 2 KB.
 
 ## Requirements
 
@@ -37,6 +40,7 @@ go build -trimpath -ldflags "-s -w" -o bin/launcher.exe ./cmd/launcher
 
 ```powershell
 go test ./...
+go test -bench . -benchmem ./internal/core/
 ```
 
 ## Layout
