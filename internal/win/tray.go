@@ -32,6 +32,7 @@ const (
 	mfChecked   = 0x0008
 
 	idiApplication = 32512
+	idcArrow       = 32512
 
 	wmLButtonUp = 0x0202
 	wmRButtonUp = 0x0205

@@ -165,11 +165,15 @@ func registerClass(cfg WindowConfig) error {
 	}
 
 	brush, _, _ := procCreateSolidBrush.Call(uintptr(cfg.Background))
+	// Without a class cursor Windows leaves whatever the previous window had,
+	// which is why the launcher could show the app-starting cursor forever.
+	cursor, _, _ := procLoadCursorW.Call(0, idcArrow)
 
 	wc := wndClassEx{
 		lpfnWndProc:   wndProcPtr,
 		hInstance:     windows.Handle(hinst),
 		hbrBackground: windows.Handle(brush),
+		hCursor:       windows.Handle(cursor),
 		lpszClassName: className,
 	}
 	wc.cbSize = uint32(unsafe.Sizeof(wc))

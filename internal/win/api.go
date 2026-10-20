@@ -155,6 +155,7 @@ var (
 	procUpdateWindow      = user32.NewProc("UpdateWindow")
 	procFillRect          = user32.NewProc("FillRect")
 	procGetDpiForWindow   = user32.NewProc("GetDpiForWindow")
+	procLoadCursorW       = user32.NewProc("LoadCursorW")
 
 	procCreateFontW         = gdi32.NewProc("CreateFontW")
 	procSelectObject        = gdi32.NewProc("SelectObject")
