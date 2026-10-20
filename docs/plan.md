@@ -171,6 +171,25 @@ what keeps matching and ranking testable without a desktop session.
 | **P3** ✅ | Frecency wired to the ranker, `history.json`, tray menu, autostart | Launched apps outrank text matches after a restart (`history.json` round-trips); tray adds, toggles autostart and quits; empty query shows only used apps |
 | **P4** 🚧 | Polish: icons ✅, acrylic ✅, tray icon | Single-monitor target: per-monitor DPI changes are out of scope and `WM_DPICHANGED` is not handled |
 
+## P5 — settings window
+
+Decided: a **separate window** (own overlap window, title bar, resizable), not an
+overlay inside the launcher popup, and changes apply **live** while editing.
+
+| Section | Controls |
+|---|---|
+| General | hotkey capture, `max_results`, `backdrop`, autostart |
+| Sources | `custom_folders` list with Add (IFileOpenDialog + FOS_PICKFOLDERS) and Remove; `exclude_folders` |
+| Manual apps | `manual_apps` table: name, target, args, icon |
+| History | record count and a clear button |
+
+Rules it has to respect:
+
+- While the settings window is open the global hotkey must not raise the launcher over it.
+- Saving keeps using `Config.Save` (atomic); live apply means each edit triggers a rescan through the same `rebuilder`, never a restart.
+- Entry points: the tray menu and a synthetic `Launcher settings` row that matches `settings`, `config` and `ajustes`.
+- The window is a second `Window` instance; `internal/win` already owns the class registration, so it needs a class variant with `WS_OVERLAPPEDWINDOW` and a normal (non-topmost) style.
+
 ## Risks
 
 | Risk | Impact | Mitigation |
