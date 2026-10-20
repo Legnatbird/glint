@@ -1,0 +1,12 @@
+# Build output
+/bin/
+/dist/
+*.exe
+*.test
+*.out
+
+# Local tooling
+/.gocache/
+/.idea/
+/.vscode/
+*.log
