@@ -197,5 +197,8 @@ const (
 	hwndTopmost               = ^uintptr(0) // (HWND)-1
 	swpNoSize                 = 0x0001
 	swpNoMove                 = 0x0002
+	swpNoZOrder               = 0x0004
+	swpNoActivate             = 0x0010
+	swpFrameChanged           = 0x0020
 	swpShowWindow             = 0x0040
 )

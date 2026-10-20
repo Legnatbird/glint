@@ -71,6 +71,12 @@ func SetLayered(hwnd uintptr, on bool) error {
 	if layered := got&wsExLayered != 0; layered != on {
 		return fmt.Errorf("win: SetWindowLongPtrW(GWL_EXSTYLE) did not stick")
 	}
+
+	// The style change only takes effect on the next frame pass. Without this the
+	// window keeps its old composition and a window that just became layered
+	// renders as a fully transparent rectangle.
+	procSetWindowPos.Call(hwnd, 0, 0, 0, 0, 0,
+		swpNoMove|swpNoSize|swpNoZOrder|swpNoActivate|swpFrameChanged)
 	return nil
 }
 

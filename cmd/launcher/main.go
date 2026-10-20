@@ -73,7 +73,7 @@ func run(cfg core.Config, demo string, seconds int, startWithSettings bool) {
 	}
 	defer shell.Destroy()
 
-	if err := applyBackdrop(shell.HWND(), cfg.Backdrop, dpi); err != nil {
+	if err := applyBackdrop(shell, cfg.Backdrop, dpi); err != nil {
 		debugf("backdrop: %v", err)
 	}
 
@@ -138,7 +138,7 @@ func run(cfg core.Config, demo string, seconds int, startWithSettings bool) {
 				Save:       func() error { return cfg.Save(configPath()) },
 				Hotkey:     hotkey.apply,
 				HotkeyLock: hotkey.lock,
-				Backdrop:   func(mode string) error { return applyBackdrop(shell.HWND(), mode, dpi) },
+				Backdrop:   func(mode string) error { return applyBackdrop(shell, mode, dpi) },
 				Autostart:  win.SetAutostart,
 				MaxResults: app.SetMaxResults,
 				Rescan:     func() { scanner.rebuild() },
@@ -405,7 +405,8 @@ func wantsDump(args []string) bool {
 // applyBackdrop switches the launcher window between the two backdrops without
 // recreating it. Acrylic needs WS_EX_LAYERED and the undocumented accent policy;
 // solid disables both and leaves the painted content on its own.
-func applyBackdrop(hwnd uintptr, mode string, dpi int32) error {
+func applyBackdrop(w *win.Window, mode string, dpi int32) error {
+	hwnd := w.HWND()
 	if mode == core.BackdropAcrylic {
 		if err := win.SetLayered(hwnd, true); err != nil {
 			return err
@@ -423,6 +424,8 @@ func applyBackdrop(hwnd uintptr, mode string, dpi int32) error {
 		if err := win.EnableAcrylic(hwnd, 0xE8161212, 255); err != nil {
 			return err
 		}
+		debugf("backdrop acrylic")
+		w.Invalidate()
 		return nil
 	}
 
@@ -431,7 +434,11 @@ func applyBackdrop(hwnd uintptr, mode string, dpi int32) error {
 		return err
 	}
 	debugf("backdrop solid")
-	return shapeWindow(hwnd, dpi)
+	if err := shapeWindow(hwnd, dpi); err != nil {
+		return err
+	}
+	w.Invalidate()
+	return nil
 }
 
 // shapeWindow gives the launcher rounded corners.
