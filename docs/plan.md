@@ -169,7 +169,7 @@ what keeps matching and ranking testable without a desktop session.
 | **P1** ✅ | `core`: matcher, ranker, config, cache format | 31 test functions green; 3 000 entries in **0.11 ms** |
 | **P2** ✅ | Sources + window + launch | 96 apps found (73 Start Menu, 11 Store, 15 App Paths, 12 PATH after the GUI filter); `.lnk` and UWP both launch; hotkey steals the foreground from another app |
 | **P3** ✅ | Frecency wired to the ranker, `history.json`, tray menu, autostart | Launched apps outrank text matches after a restart (`history.json` round-trips); tray adds, toggles autostart and quits; empty query shows only used apps |
-| **P4** 🚧 | Polish: icons ✅, acrylic ✅, DPI, packaging | Acrylic needs a layered window and a 91% tint to stay readable; solid remains the fallback |
+| **P4** 🚧 | Polish: icons ✅, acrylic ✅, tray icon | Single-monitor target: per-monitor DPI changes are out of scope and `WM_DPICHANGED` is not handled |
 
 ## Risks
 
@@ -179,7 +179,7 @@ what keeps matching and ranking testable without a desktop session.
 | MSI advertised shortcuts resolve to a stub | App "opens" nothing | Launch the `.lnk` via ShellExecute; never the parsed target |
 | Some UWP entries lack a launchable AUMID | Dead result rows | Validate at index time; drop entries that fail activation |
 | Icon extraction cost | Slow first paint, handle growth | Lazy per-visible-row icons, LRU cap 64, GDI handle budget asserted in tests |
-| Windows 10 has no Mica | Square, flat window vs Win11 | Solid dark background with DWM rounded corners on 11; documented, not a blocker |
+| Windows 10 has no Mica | Square, flat window vs Win11 | Acrylic via SetWindowCompositionAttribute, solid as fallback |
 | Antivirus/SmartScreen on unsigned exe | Distribution friction | Out of scope: portable, personal use |
 
 ## Open decisions (defaults already chosen; say the word to change any)
