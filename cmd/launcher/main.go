@@ -410,34 +410,40 @@ func applyBackdrop(hwnd uintptr, mode string, dpi int32) error {
 		if err := win.SetLayered(hwnd, true); err != nil {
 			return err
 		}
+		// Shape first: the region only clips what we paint, while the accent
+		// covers the whole window rectangle. Applying the accent to an already
+		// shaped window keeps the tint from spilling into the corners.
+		if err := shapeWindow(hwnd, dpi); err != nil {
+			return err
+		}
 		// AABBGGRR: dark tint at 91% alpha. The tint is what controls how much
-		// of the blurred desktop reaches the eye; the paint stays opaque.
+		// of the blurred desktop reaches the eye. Note that GDI paint on this
+		// layered window lands at roughly half opacity, which is why the accent
+		// shows through the panel at all.
 		if err := win.EnableAcrylic(hwnd, 0xE8161212, 255); err != nil {
 			return err
 		}
-	} else {
-		win.DisableAcrylic(hwnd)
-		if err := win.SetLayered(hwnd, false); err != nil {
-			return err
-		}
-		debugf("backdrop solid")
+		return nil
 	}
 
-	return roundWindow(hwnd, dpi)
+	win.DisableAcrylic(hwnd)
+	if err := win.SetLayered(hwnd, false); err != nil {
+		return err
+	}
+	debugf("backdrop solid")
+	return shapeWindow(hwnd, dpi)
 }
 
-// roundWindow gives the launcher rounded corners.
+// shapeWindow gives the launcher rounded corners.
 //
-// DWM is asked first: its corners are antialiased. A window region is the
-// fallback for Windows 10, where the clip is binary and the arc shows as a
-// staircase, so the radius stays small there.
-func roundWindow(hwnd uintptr, dpi int32) error {
+// DWM is asked first: its corners are antialiased and need no region. Windows 10
+// has no such attribute, so the window is clipped to a region and the arc is a
+// staircase of whole pixels.
+func shapeWindow(hwnd uintptr, dpi int32) error {
 	if err := win.RoundCornersDWM(hwnd); err == nil {
 		win.ClearRegion(hwnd)
 		debugf("corners: dwm")
 		return nil
-	} else {
-		debugf("corners: %v (falling back to a region)", err)
 	}
 	return win.RoundCorners(hwnd, ui.CornerRadius*dpi/96)
 }
