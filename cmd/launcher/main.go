@@ -62,9 +62,11 @@ func run(cfg core.Config, demo string, seconds int, startWithSettings bool) {
 	dpi := int32(win.SystemDPI())
 
 	shell, err := win.NewWindow(win.WindowConfig{
-		Title:      "Launcher",
-		Width:      700 * dpi / 96,
-		Height:     500 * dpi / 96,
+		Title: "Launcher",
+		Width: 700 * dpi / 96,
+		// 540 keeps the nine rows the 44px layout used to show now that a row is
+		// 50px tall: (footer - gap - listTop) / rowH has to stay above nine.
+		Height:     540 * dpi / 96,
 		Background: ui.ColorBackground,
 	})
 	if err != nil {

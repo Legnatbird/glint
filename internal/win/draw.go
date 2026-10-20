@@ -185,7 +185,7 @@ func NewFonts(dpi uint32) *Fonts {
 	}
 	return &Fonts{
 		Query:  createFont(scale(24), fwNormal),
-		Row:    createFont(scale(16), fwNormal),
+		Row:    createFont(scale(18), fwNormal),
 		Footer: createFont(scale(12), fwNormal),
 	}
 }

@@ -148,11 +148,15 @@ executable's own icon all come from that one buffer — see
 
 Row icons come from the shell (`SHGetFileInfoW` for files, `IShellItemImageFactory`
 for packaged apps). Both kinds are decoded once into BGRA at their own size and
-drawn into a 28 px slot at 89% of it, with one resample that averages area when the
+drawn into a 32 px slot at 29 px, with one resample that averages area when the
 icon shrinks and interpolates when it grows. GDI never scales an icon here:
 `DrawIconEx` resamples with the device's raw stretch mode, which leaves hard,
 stepped edges, and it was the reason the list looked badly rendered while every
 shape in it was correct.
+
+A row is 50 px tall and its text is drawn at 18 px; the window is 700×540 so nine
+results still fit. Those three numbers move together: shrinking the row without
+the font, or growing the font without the row, is what makes a list look cramped.
 
 The visible box, not the canvas, is what gets fitted. Packaged logos arrive inside
 a 32×32 canvas that may hold a 24×18 mark, and file icons carry whatever padding

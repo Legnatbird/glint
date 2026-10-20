@@ -34,7 +34,7 @@ func (a *App) computeLayout() layout {
 		pad:      a.scale(18),
 		inputTop: a.scale(14),
 		inputH:   a.scale(32),
-		rowH:     a.scale(44),
+		rowH:     a.scale(50),
 		footerY:  a.height - a.scale(10),
 	}
 	l.listTop = l.inputTop + l.inputH + a.scale(10)
@@ -142,8 +142,8 @@ func (a *App) paintResults(c *win.Canvas, l layout) {
 // 4:3 tiles — gets scaled to the slot's width, so filling it edge to edge makes
 // the tile read as stretched next to the square logos in the same list.
 const (
-	iconSlot = 28 // reserved square, in logical pixels
-	iconFill = 25 // drawn logo, about 89% of the slot
+	iconSlot = 32 // reserved square, in logical pixels
+	iconFill = 29 // drawn logo, about 90% of the slot
 )
 
 // paintRow draws one result: icon, then the name with the matched runes in the
@@ -151,7 +151,7 @@ const (
 func (a *App) paintRow(c *win.Canvas, r core.Result, y int32, l layout, selected bool) {
 	slot := a.scale(iconSlot)
 	fill := a.scale(iconFill)
-	iconGap := a.scale(14)
+	iconGap := a.scale(16)
 
 	// Icons decoded from the shell carry alpha, so they need the colour behind
 	// them in order to composite.
