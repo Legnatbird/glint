@@ -182,12 +182,20 @@ plated form when asked with `SIIGBF_ICONONLY` and the plain logo with no flags, 
 the launcher asks for the logo: a list of rows wants the app's art, not a wall of
 blue squares.
 
-Those logos carry an alpha channel and neither drawing path handles them:
-`DrawIconEx` decides transparency from a 1bpp AND mask, and `AlphaBlend`
-rejects the shell's surfaces with `ERROR_INVALID_PARAMETER` on this build. The
-pixels are therefore kept in Go, resampled bilinearly, composited over the row
-colour and blitted with `StretchDIBits` — one call per icon, no GDI handle per
-app, and antialiased edges for the price of 784 pixels per row.
+Those logos carry an alpha channel, and GDI will not do the job: `DrawIconEx`
+decides transparency from a 1bpp AND mask and scales with the device's raw stretch
+mode, which is what left hard, stepped edges around every circle, while
+`AlphaBlend` rejects the shell's surfaces with `ERROR_INVALID_PARAMETER` on this
+build. So every icon — HICON or shell bitmap — is decoded once into straight-alpha
+BGRA at its own size, its visible box is measured once, and drawing fits that box
+to the row with a single resample: area averaging when it shrinks, interpolation
+when it grows. One `StretchDIBits` per icon, no GDI handle held per app, and the
+same edge quality for both kinds of icon.
+
+Decoding is also what makes the two paths agree. Packaged logos arrive as the
+nearest asset the package ships (a 32×32 canvas holding a 24×18 mark), file icons
+arrive with whatever padding their `.ico` author chose; fitting the *visible box*
+gives them the same optical weight in a row without ever changing their shape.
 
 ## P5 — settings window
 
@@ -221,7 +229,7 @@ Rules it has to respect:
 | `SetForegroundWindow` refused | Launcher opens behind the active app | `AttachThreadInput` fallback; P2 acceptance test with a fullscreen game |
 | MSI advertised shortcuts resolve to a stub | App "opens" nothing | Launch the `.lnk` via ShellExecute; never the parsed target |
 | Some UWP entries lack a launchable AUMID | Dead result rows | Validate at index time; drop entries that fail activation |
-| Icon extraction cost | Slow first paint, handle growth | Lazy per-visible-row icons, LRU cap 64, GDI handle budget asserted in tests |
+| Icon extraction cost | Slow first paint, handle growth | Lazy per-visible-row icons, LRU cap 128, each cached icon 4 KB of decoded pixels instead of a live HICON; GDI handle budget asserted in tests |
 | Windows 10 has no Mica | Square, flat window vs Win11 | The window stays opaque and rounds through a region; a translucent backdrop was removed because the accent is not clipped by the region and left dark corners |
 | Antivirus/SmartScreen on unsigned exe | Distribution friction | Out of scope: portable, personal use |
 

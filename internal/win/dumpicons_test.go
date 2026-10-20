@@ -70,8 +70,8 @@ func TestDumpPackagedIcons(t *testing.T) {
 				})
 			}
 		}
-		minX, minY, maxX, maxY := contentBounds(pixels.bgra, pixels.size)
-		t.Logf("%-40s density=%.3f bounds=%d,%d..%d,%d", app.Name, density(pixels), minX, minY, maxX, maxY)
+		box := pixels.content
+		t.Logf("%-40s density=%.3f bounds=%d,%d %dx%d", app.Name, density(pixels), box.x, box.y, box.w, box.h)
 	}
 
 	path := filepath.Join(outDir, "packaged-icons.png")
@@ -95,5 +95,5 @@ func density(p *iconPixels) float64 {
 			visible++
 		}
 	}
-	return float64(visible) / float64(p.size*p.size)
+	return float64(visible) / float64(p.width*p.height)
 }

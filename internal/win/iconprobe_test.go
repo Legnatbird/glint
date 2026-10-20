@@ -75,17 +75,17 @@ func TestProbePackagedIcon(t *testing.T) {
 			bmPlanes, bmBitsPixel                   uint16
 			bmBits                                  uintptr
 		}
-		procGetObject.Call(uintptr(bitmap), unsafe.Sizeof(bm), uintptr(unsafe.Pointer(&bm)))
+		procGetObjectW.Call(uintptr(bitmap), unsafe.Sizeof(bm), uintptr(unsafe.Pointer(&bm)))
 		t.Logf("%-22s bitmap is %dx%d %dbpp", probe.name, bm.bmWidth, bm.bmHeight, bm.bmBitsPixel)
 
-		pixels, err := readBitmapPixels(bitmap, int32(probe.size))
+		pixels, err := readBitmapPixels(bitmap, bm.bmWidth, bm.bmHeight)
 		procDeleteObject.Call(uintptr(bitmap))
 		if err != nil {
 			t.Logf("%-22s %v", probe.name, err)
 			continue
 		}
 
-		img := bgraToImage(pixels, int32(probe.size))
+		img := bgraToImage(pixels, bm.bmWidth, bm.bmHeight)
 		path := filepath.Join(outDir, "probe-"+probe.name+".png")
 		file, err := os.Create(path)
 		if err != nil {
@@ -104,17 +104,18 @@ func TestProbePackagedIcon(t *testing.T) {
 	}
 }
 
-var procGetObject = gdi32.NewProc("GetObjectW")
-
-func bgraToImage(pixels []byte, size int32) image.Image {
-	img := image.NewNRGBA(image.Rect(0, 0, int(size), int(size)))
-	for i := int32(0); i < size*size; i++ {
-		img.SetNRGBA(int(i%size), int(i/size), color.NRGBA{
-			R: pixels[i*4+2],
-			G: pixels[i*4+1],
-			B: pixels[i*4+0],
-			A: pixels[i*4+3],
-		})
+func bgraToImage(pixels []byte, width, height int32) image.Image {
+	img := image.NewNRGBA(image.Rect(0, 0, int(width), int(height)))
+	for y := int32(0); y < height; y++ {
+		for x := int32(0); x < width; x++ {
+			offset := (y*width + x) * 4
+			img.SetNRGBA(int(x), int(y), color.NRGBA{
+				R: pixels[offset+2],
+				G: pixels[offset+1],
+				B: pixels[offset+0],
+				A: pixels[offset+3],
+			})
+		}
 	}
 	return img
 }

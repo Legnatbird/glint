@@ -8,19 +8,21 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Icon pixels, and why they are blended in Go.
+// Icon pixels, and why every icon is blended in Go.
 //
-// Most icons arrive as an HICON and are drawn with DrawIconEx, which takes them
-// as they are. Packaged apps are different: the shell hands back a 32bpp bitmap
-// with antialiased edges and transparent corners, and DrawIconEx decides
-// transparency from a 1bpp AND mask, not from the alpha channel — feeding it one
-// turns the corners into a hard, ragged frame.
+// The shell can hand back an icon as an HICON or as a 32bpp bitmap, and both
+// arrive bigger than the row that shows them (32px art in a 25px slot). Letting
+// GDI scale them is what made the list look ragged: DrawIconEx resamples with the
+// device's raw stretch mode, so a circle arrives with hard, stepped edges, while
+// the shell's bitmaps went through two resamples (once to trim their padding and
+// once to fit the slot) and arrived soft. Neither is a geometry problem — the
+// shapes were always right — but both read as "badly rendered".
 //
-// AlphaBlend is the obvious answer, but on this Windows build it rejects these
-// surfaces with ERROR_INVALID_PARAMETER even for a plain DDB-to-DDB copy, so the
-// pixels stay in Go: trim, resample, composite over the row background and
-// stretch the result to the screen in one StretchDIBits call. Deterministic, and
-// nothing depends on a blending path that cannot be debugged from here.
+// So the pixels stay in Go: each icon is decoded once at its native size, its
+// visible box is measured once, and drawing fits that box into the slot with a
+// single resample that averages area when shrinking and interpolates when
+// growing. AlphaBlend is not an option here: on this Windows build it rejects
+// these surfaces with ERROR_INVALID_PARAMETER even for a plain DDB-to-DDB copy.
 
 var (
 	procStretchDIBits  = gdi32.NewProc("StretchDIBits")
@@ -31,25 +33,36 @@ var (
 
 const srcCopy = 0x00CC0020
 
-// iconPixels is a decoded icon: size x size straight-alpha BGRA.
+// iconPixels is a decoded icon: width x height straight-alpha BGRA, plus the box
+// that actually holds visible pixels.
 type iconPixels struct {
-	size int32
-	bgra []byte
+	width, height int32
+	bgra          []byte
+	content       contentBox
+}
+
+// contentBox is the part of a buffer that is not fully transparent.
+type contentBox struct {
+	x, y, w, h int32
 }
 
 // readBitmapPixels copies an HBITMAP into a top-down BGRA buffer.
-func readBitmapPixels(bitmap windows.Handle, size int32) ([]byte, error) {
+func readBitmapPixels(bitmap windows.Handle, width, height int32) ([]byte, error) {
+	if width <= 0 || height <= 0 || bitmap == 0 {
+		return nil, fmt.Errorf("win: bitmap has no pixels")
+	}
+
 	info := bitmapInfo{}
 	info.header = bitmapInfoHeader{
 		biSize:        uint32(unsafe.Sizeof(info.header)),
-		biWidth:       size,
-		biHeight:      -size,
+		biWidth:       width,
+		biHeight:      -height,
 		biPlanes:      1,
 		biBitCount:    iconDIBLayout,
 		biCompression: biRGB,
 	}
 
-	pixels := make([]byte, size*size*4)
+	pixels := make([]byte, int(width)*int(height)*4)
 	dc, _, dcErr := procCreateCompatDC.Call(0)
 	if dc == 0 {
 		return nil, fmt.Errorf("win: CreateCompatibleDC: %w", dcErr)
@@ -60,7 +73,7 @@ func readBitmapPixels(bitmap windows.Handle, size int32) ([]byte, error) {
 		dc,
 		uintptr(bitmap),
 		0,
-		uintptr(size),
+		uintptr(height),
 		uintptr(unsafe.Pointer(&pixels[0])),
 		uintptr(unsafe.Pointer(&info)),
 		0, // DIB_RGB_COLORS
@@ -73,17 +86,18 @@ func readBitmapPixels(bitmap windows.Handle, size int32) ([]byte, error) {
 
 // drawIconPixels composites the icon over bg and blits the result at size.
 func (p *iconPixels) draw(c *Canvas, x, y, size int32, bg uint32) {
-	if p == nil || size <= 0 || p.size <= 0 {
+	if p == nil || size <= 0 || p.width <= 0 || p.height <= 0 {
 		return
 	}
 	dst := int(size)
 	buf := c.scratch(dst * dst * 4)
-	p.composite(buf, dst, bg)
+	p.composite(buf, size, bg)
 	blitDIB(c, buf, dst, x, y)
 }
 
-// composite resamples the icon to dst x dst over a solid background.
-func (p *iconPixels) composite(out []byte, dst int, bg uint32) {
+// composite fits the icon's visible box into a size x size square and resamples
+// it once, blending each pixel over bg.
+func (p *iconPixels) composite(out []byte, size int32, bg uint32) {
 	// bg is a COLORREF (0x00BBGGRR): the low byte is red, not blue. Reading it
 	// the other way round paints the icon's transparent margin in a colour that
 	// misses the row by a few levels, which shows up as a box around the icon.
@@ -91,80 +105,66 @@ func (p *iconPixels) composite(out []byte, dst int, bg uint32) {
 	bgG := byte(bg >> 8)
 	bgR := byte(bg)
 
-	scale := float64(p.size) / float64(dst)
-	for dy := 0; dy < dst; dy++ {
-		sy := (float64(dy)+0.5)*scale - 0.5
-		for dx := 0; dx < dst; dx++ {
-			sx := (float64(dx)+0.5)*scale - 0.5
-			sample := sampleBilinear(p.bgra, p.size, sx, sy)
+	// The slot is square and the artwork usually is not, so the margin starts as
+	// the row colour and the artwork is centred over it.
+	for i := 0; i < len(out); i += 4 {
+		out[i+0], out[i+1], out[i+2], out[i+3] = bgB, bgG, bgR, 255
+	}
+
+	box := p.content
+	if box.w <= 0 || box.h <= 0 {
+		return
+	}
+
+	scale := math.Min(float64(size)/float64(box.w), float64(size)/float64(box.h))
+	w := int32(math.Round(float64(box.w) * scale))
+	h := int32(math.Round(float64(box.h) * scale))
+	if w > size {
+		w = size
+	}
+	if h > size {
+		h = size
+	}
+	if w <= 0 || h <= 0 {
+		return
+	}
+	x0 := (size - w) / 2
+	y0 := (size - h) / 2
+
+	// One source texel spans step destination pixels, so step > 1 means the icon
+	// is being shrunk and the sampler has to average instead of point-sample.
+	step := 1 / scale
+	for dy := int32(0); dy < h; dy++ {
+		sy := float64(box.y) + (float64(dy)+0.5)*step - 0.5
+		row := (int(y0+dy)*int(size) + int(x0)) * 4
+		for dx := int32(0); dx < w; dx++ {
+			sx := float64(box.x) + (float64(dx)+0.5)*step - 0.5
+			b, g, r, a := p.sample(sx, sy, step).straight()
 
 			// RGB is pre-blended over the row colour, which is what an opaque
 			// window blits. The alpha byte is carried through anyway: it costs
 			// nothing and keeps the buffer meaningful if it is ever drawn on a
 			// composited surface.
-			a := sample[3] / 255
-			offset := (dy*dst + dx) * 4
-			out[offset+0] = clampByte(sample[0]*a + float64(bgB)*(1-a))
-			out[offset+1] = clampByte(sample[1]*a + float64(bgG)*(1-a))
-			out[offset+2] = clampByte(sample[2]*a + float64(bgR)*(1-a))
-			out[offset+3] = clampByte(sample[3])
+			cov := a / 255
+			offset := row + int(dx)*4
+			out[offset+0] = clampByte(b*cov + float64(bgB)*(1-cov))
+			out[offset+1] = clampByte(g*cov + float64(bgG)*(1-cov))
+			out[offset+2] = clampByte(r*cov + float64(bgR)*(1-cov))
+			out[offset+3] = clampByte(a)
 		}
 	}
-}
-
-// trimToContent scales the artwork so it fills the icon box.
-//
-// A packaged app's logo is authored on a 32px canvas with padding, and the
-// padding is not uniform: Terminal's tile covers about 28 of those pixels while a
-// glyph such as Character Map's fills the frame, so in a row the first reads as a
-// smaller icon. The transparent border is trimmed and the content re-scaled to
-// fill, which puts every icon on the same optical footing.
-func trimToContent(pixels []byte, size int32) []byte {
-	minX, minY, maxX, maxY := contentBounds(pixels, size)
-	if maxX < minX || maxY < minY {
-		return pixels // nothing visible
-	}
-
-	w := maxX - minX + 1
-	h := maxY - minY + 1
-	if w >= size-1 && h >= size-1 {
-		return pixels // already fills the frame
-	}
-
-	out := make([]byte, len(pixels))
-	span := w
-	if h > span {
-		span = h
-	}
-	scale := float64(size) / float64(span)
-	offX := (float64(size) - float64(w)*scale) / 2
-	offY := (float64(size) - float64(h)*scale) / 2
-
-	for dy := int32(0); dy < size; dy++ {
-		sy := float64(minY) + (float64(dy)+0.5-offY)/scale - 0.5
-		for dx := int32(0); dx < size; dx++ {
-			sx := float64(minX) + (float64(dx)+0.5-offX)/scale - 0.5
-			sample := sampleBilinear(pixels, size, sx, sy)
-			offset := (dy*size + dx) * 4
-			out[offset+0] = clampByte(sample[0])
-			out[offset+1] = clampByte(sample[1])
-			out[offset+2] = clampByte(sample[2])
-			out[offset+3] = clampByte(sample[3])
-		}
-	}
-	return out
 }
 
 // contentBounds returns the box that holds every pixel that is not fully
-// transparent, in exclusive-max coordinates.
-func contentBounds(pixels []byte, size int32) (minX, minY, maxX, maxY int32) {
-	minX, minY = size, size
-	maxX, maxY = -1, -1
+// transparent.
+func contentBounds(bgra []byte, width, height int32) contentBox {
+	minX, minY := width, height
+	maxX, maxY := int32(-1), int32(-1)
 
 	const visible = 8 // ignore the faint antialiasing at the very edge
-	for y := int32(0); y < size; y++ {
-		for x := int32(0); x < size; x++ {
-			if pixels[(y*size+x)*4+3] <= visible {
+	for y := int32(0); y < height; y++ {
+		for x := int32(0); x < width; x++ {
+			if bgra[(y*width+x)*4+3] <= visible {
 				continue
 			}
 			if x < minX {
@@ -181,18 +181,62 @@ func contentBounds(pixels []byte, size int32) (minX, minY, maxX, maxY int32) {
 			}
 		}
 	}
-	return minX, minY, maxX, maxY
+	if maxX < minX || maxY < minY {
+		return contentBox{}
+	}
+	return contentBox{x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1}
 }
 
-// sampleBilinear reads the colour at fractional pixel (fx, fy).
-//
-// Interpolation happens in premultiplied space: sampling straight alpha would
-// drag the colour of transparent pixels (black) into the edges of a glyph and
-// leave a dark fringe around every icon.
-func sampleBilinear(pixels []byte, size int32, fx, fy float64) [4]float64 {
-	last := float64(size - 1)
-	fx = math.Max(0, math.Min(last, fx))
-	fy = math.Max(0, math.Min(last, fy))
+// sample reads the icon at fractional source position (fx, fy). step is the
+// source span of one destination pixel: shrinking averages the whole footprint,
+// which is what keeps a small circle round instead of stepped.
+func (p *iconPixels) sample(fx, fy, step float64) premul {
+	if step <= 1 {
+		return p.bilinear(fx, fy)
+	}
+
+	n := int(math.Ceil(step))
+	if n > 4 {
+		n = 4
+	}
+	// The footprint is centred on fx, so the taps start at its left edge;
+	// sampling from fx itself would walk off the end and clamp.
+	half := step / 2
+	var acc premul
+	for i := 0; i < n; i++ {
+		sx := fx - half + (float64(i)+0.5)*step/float64(n)
+		for j := 0; j < n; j++ {
+			sy := fy - half + (float64(j)+0.5)*step/float64(n)
+			s := p.bilinear(sx, sy)
+			acc.b += s.b
+			acc.g += s.g
+			acc.r += s.r
+			acc.a += s.a
+		}
+	}
+	k := 1 / float64(n*n)
+	return premul{b: acc.b * k, g: acc.g * k, r: acc.r * k, a: acc.a * k}
+}
+
+// premul is a colour with premultiplied alpha, which is the only space where
+// mixing is correct: averaging straight alpha would drag the colour of
+// transparent pixels (black) into the edges and leave a dark fringe.
+type premul struct{ b, g, r, a float64 }
+
+// straight returns the colour with straight alpha, all channels in 0..255.
+func (s premul) straight() (b, g, r, a float64) {
+	if s.a <= 0 {
+		return 0, 0, 0, 0
+	}
+	k := 255 / s.a
+	return s.b * k, s.g * k, s.r * k, s.a
+}
+
+func (p *iconPixels) bilinear(fx, fy float64) premul {
+	lastX := float64(p.width - 1)
+	lastY := float64(p.height - 1)
+	fx = math.Max(0, math.Min(lastX, fx))
+	fy = math.Max(0, math.Min(lastY, fy))
 
 	x0 := int32(math.Floor(fx))
 	y0 := int32(math.Floor(fy))
@@ -200,44 +244,37 @@ func sampleBilinear(pixels []byte, size int32, fx, fy float64) [4]float64 {
 	fracY := fy - float64(y0)
 
 	x1, y1 := x0+1, y0+1
-	if x1 >= size {
-		x1 = size - 1
+	if x1 >= p.width {
+		x1 = p.width - 1
 	}
-	if y1 >= size {
-		y1 = size - 1
-	}
-
-	type premul struct{ b, g, r, a float64 }
-	load := func(x, y int32) premul {
-		offset := (y*size + x) * 4
-		a := float64(pixels[offset+3])
-		scale := a / 255
-		return premul{
-			b: float64(pixels[offset+0]) * scale,
-			g: float64(pixels[offset+1]) * scale,
-			r: float64(pixels[offset+2]) * scale,
-			a: a,
-		}
+	if y1 >= p.height {
+		y1 = p.height - 1
 	}
 
-	p00, p10 := load(x0, y0), load(x1, y0)
-	p01, p11 := load(x0, y1), load(x1, y1)
+	top := mixPremul(p.load(x0, y0), p.load(x1, y0), fracX)
+	bot := mixPremul(p.load(x0, y1), p.load(x1, y1), fracX)
+	return mixPremul(top, bot, fracY)
+}
 
-	mix := func(a, b float64) float64 { return a*(1-fracX) + b*fracX }
-	topB, topG, topR, topA := mix(p00.b, p10.b), mix(p00.g, p10.g), mix(p00.r, p10.r), mix(p00.a, p10.a)
-	botB, botG, botR, botA := mix(p01.b, p11.b), mix(p01.g, p11.g), mix(p01.r, p11.r), mix(p01.a, p11.a)
-
-	outA := topA*(1-fracY) + botA*fracY
-	outB := topB*(1-fracY) + botB*fracY
-	outG := topG*(1-fracY) + botG*fracY
-	outR := topR*(1-fracY) + botR*fracY
-
-	if outA <= 0 {
-		return [4]float64{0, 0, 0, 0}
+func (p *iconPixels) load(x, y int32) premul {
+	offset := (y*p.width + x) * 4
+	a := float64(p.bgra[offset+3])
+	k := a / 255
+	return premul{
+		b: float64(p.bgra[offset+0]) * k,
+		g: float64(p.bgra[offset+1]) * k,
+		r: float64(p.bgra[offset+2]) * k,
+		a: a,
 	}
-	// Back to straight alpha for the caller.
-	inv := 255 / outA
-	return [4]float64{outB * inv, outG * inv, outR * inv, outA}
+}
+
+func mixPremul(a, b premul, t float64) premul {
+	return premul{
+		b: a.b*(1-t) + b.b*t,
+		g: a.g*(1-t) + b.g*t,
+		r: a.r*(1-t) + b.r*t,
+		a: a.a*(1-t) + b.a*t,
+	}
 }
 
 func clampByte(v float64) byte {
@@ -262,6 +299,7 @@ func blitDIB(c *Canvas, pixels []byte, size int, x, y int32) {
 		biBitCount:    iconDIBLayout,
 		biCompression: biRGB,
 	}
+
 	procStretchDIBits.Call(c.hdc,
 		uintptr(x), uintptr(y), uintptr(size), uintptr(size),
 		0, 0, uintptr(size), uintptr(size),

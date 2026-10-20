@@ -69,8 +69,8 @@ func TestRenderIcons(t *testing.T) {
 
 		label := tg.name
 		if icon.pixels != nil {
-			minX, minY, maxX, maxY := contentBounds(icon.pixels.bgra, icon.pixels.size)
-			label += fmt.Sprintf(" [px %dx%d]", maxX-minX+1, maxY-minY+1)
+			box := icon.pixels.content
+			label += fmt.Sprintf(" [px %dx%d of %dx%d]", box.w, box.h, icon.pixels.width, icon.pixels.height)
 		} else if icon.h != 0 {
 			var bm struct {
 				bmType, bmWidth, bmHeight, bmWidthBytes int32
@@ -79,18 +79,18 @@ func TestRenderIcons(t *testing.T) {
 			}
 			var ii iconInfo
 			if r, _, _ := procGetIconInfo.Call(uintptr(icon.h), uintptr(unsafe.Pointer(&ii))); r != 0 {
-				procGetObject.Call(uintptr(ii.hbmColor), unsafe.Sizeof(bm), uintptr(unsafe.Pointer(&bm)))
+				procGetObjectW.Call(uintptr(ii.hbmColor), unsafe.Sizeof(bm), uintptr(unsafe.Pointer(&bm)))
 				label += fmt.Sprintf(" [hicon %dx%d %dbpp]", bm.bmWidth, bm.bmHeight, bm.bmBitsPixel)
 				procDeleteObject.Call(uintptr(ii.hbmColor))
 				procDeleteObject.Call(uintptr(ii.hbmMask))
 			}
 		}
 
-		// Bounds of what was actually painted, at 96px.
-		minX, minY, maxX, maxY := contentBounds(pixels, size)
-		t.Logf("%-38s drawn %dx%d (ratio %.2f) from %s",
-			label, maxX-minX+1, maxY-minY+1,
-			float64(maxX-minX+1)/float64(maxY-minY+1), tg.path)
+		// Bounds of what was actually painted, at 96px. The buffer is opaque, so
+		// the box is measured against the colour the slot was filled with.
+		drawn := paintedBox(pixels, size, size, 0x332A2A)
+		aspect := float64(drawn.w) / float64(drawn.h)
+		t.Logf("%-38s drawn %dx%d (ratio %.2f) from %s", label, drawn.w, drawn.h, aspect, tg.path)
 
 		writeIconPNG(t, filepath.Join(outDir, "r-"+sanitize(tg.name)+".png"), pixels, size)
 
@@ -250,8 +250,6 @@ func writeIconSheet(t *testing.T, path string, sheet image.Image) {
 		t.Fatalf("encode %s: %v", path, err)
 	}
 }
-
-var procGetIconInfo = user32.NewProc("GetIconInfo")
 
 func sanitize(name string) string {
 	out := make([]rune, 0, len(name))

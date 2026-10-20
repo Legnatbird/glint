@@ -226,14 +226,26 @@ func extractItemImage(folder comPtr, pidl unsafe.Pointer) (Icon, error) {
 	}
 	defer procDeleteObject.Call(uintptr(bitmap))
 
-	pixels, err := readBitmapPixels(bitmap, iconSizePixels)
+	// Read the bitmap at its own size: GetImage hands back the nearest asset the
+	// package ships, which is not always the size that was asked for.
+	var bm nativeBitmap
+	if r, _, _ := procGetObjectW.Call(uintptr(bitmap), unsafe.Sizeof(bm), uintptr(unsafe.Pointer(&bm))); r == 0 {
+		return Icon{}, fmt.Errorf("win: GetObjectW on the shell image failed")
+	}
+	pixels, err := readBitmapPixels(bitmap, bm.bmWidth, bm.bmHeight)
 	if err != nil {
 		return Icon{}, err
 	}
 
-	// Logos ship with uneven transparent padding; trim it so every icon has the
-	// same optical weight in a row.
-	return Icon{pixels: &iconPixels{size: iconSizePixels, bgra: trimToContent(pixels, iconSizePixels)}}, nil
+	// Logos ship with uneven transparent padding. The visible box is measured
+	// here, once; drawing fits that box to the row, so the padding disappears
+	// without the artwork being resampled a second time.
+	return Icon{pixels: &iconPixels{
+		width:   bm.bmWidth,
+		height:  bm.bmHeight,
+		bgra:    pixels,
+		content: contentBounds(pixels, bm.bmWidth, bm.bmHeight),
+	}}, nil
 }
 
 type iconInfo struct {

@@ -159,8 +159,10 @@ var (
 	procFillRect          = user32.NewProc("FillRect")
 	procGetDpiForWindow   = user32.NewProc("GetDpiForWindow")
 	procLoadCursorW       = user32.NewProc("LoadCursorW")
+	procGetIconInfo       = user32.NewProc("GetIconInfo")
 
 	procCreateFontW         = gdi32.NewProc("CreateFontW")
+	procGetObjectW          = gdi32.NewProc("GetObjectW")
 	procSelectObject        = gdi32.NewProc("SelectObject")
 	procSetTextColor        = gdi32.NewProc("SetTextColor")
 	procSetBkMode           = gdi32.NewProc("SetBkMode")
