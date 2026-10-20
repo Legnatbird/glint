@@ -223,6 +223,15 @@ func wantsSettings(query string) bool {
 	return false
 }
 
+// resetCaret shows the caret again and restarts its blink, so it is never
+// invisible at the moment the user starts typing.
+func (a *App) resetCaret() {
+	a.caretOn = true
+	if a.visible {
+		a.window.SetTimer(timerCaret, caretBlink)
+	}
+}
+
 func (a *App) onChar(r rune) {
 	if !a.visible {
 		return
@@ -234,6 +243,7 @@ func (a *App) onChar(r rune) {
 			a.selected = 0
 			a.status = ""
 			a.refresh()
+			a.resetCaret()
 			a.window.Invalidate()
 		}
 		return
@@ -245,6 +255,7 @@ func (a *App) onChar(r rune) {
 	a.selected = 0
 	a.status = ""
 	a.refresh()
+	a.resetCaret()
 	a.window.Invalidate()
 }
 
@@ -259,6 +270,7 @@ func (a *App) onKey(k win.KeyEvent) bool {
 			a.query = a.query[:0]
 			a.selected = 0
 			a.refresh()
+			a.resetCaret()
 			a.window.Invalidate()
 			return true
 		}

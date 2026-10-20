@@ -14,10 +14,11 @@ import (
 var procDrawTextW = user32.NewProc("DrawTextW")
 
 const (
-	dtLeft       = 0x00000000
-	dtTop        = 0x00000000
-	dtSingleLine = 0x00000020
-	dtNoPrefix   = 0x00000800
+	dtLeft        = 0x00000000
+	dtTop         = 0x00000000
+	dtSingleLine  = 0x00000020
+	dtNoPrefix    = 0x00000800
+	dtEndEllipsis = 0x00008000
 
 	cleartypeQuality = 5
 	defaultCharset   = 1
@@ -138,6 +139,78 @@ func (c *Canvas) Text(s string, x, y int32, color uint32) {
 		uintptr(unsafe.Pointer(&r)),
 		dtLeft|dtTop|dtSingleLine|dtNoPrefix,
 	)
+}
+
+// TextIn draws one line starting at r's top-left and never wider than r. What
+// does not fit is shortened with an ellipsis by GDI, which keeps whole glyphs;
+// clipping at the window edge leaves half a letter, which reads as a broken
+// layout rather than as missing text.
+func (c *Canvas) TextIn(s string, r Rect, color uint32) {
+	if s == "" || r.Right <= r.Left || r.Bottom <= r.Top {
+		return
+	}
+	ptr, err := windows.UTF16PtrFromString(s)
+	if err != nil {
+		return
+	}
+
+	procSetBkMode.Call(c.hdc, transparentBkMode)
+	procSetTextColor.Call(c.hdc, uintptr(color))
+	box := nativeRect{r.Left, r.Top, r.Right, r.Bottom}
+	procDrawTextW.Call(c.hdc,
+		uintptr(unsafe.Pointer(ptr)),
+		^uintptr(0),
+		uintptr(unsafe.Pointer(&box)),
+		dtLeft|dtTop|dtSingleLine|dtNoPrefix|dtEndEllipsis,
+	)
+}
+
+// Shorten returns s made to fit in width, ending it with an ellipsis when it has
+// to be cut. The binary search keeps this to a handful of measurements instead of
+// one per rune, which matters when every visible row does it on every keystroke.
+func (c *Canvas) Shorten(s string, width int32) string {
+	if c.Measure(s) <= width {
+		return s
+	}
+	const dots = "…"
+	dotsW := c.Measure(dots)
+	if width <= dotsW {
+		return dots
+	}
+
+	runes := []rune(s)
+	// Largest k with Measure(runes[:k]) + dots <= width.
+	lo, hi := 0, len(runes)
+	for lo < hi {
+		mid := (lo + hi + 1) / 2
+		if c.Measure(string(runes[:mid]))+dotsW <= width {
+			lo = mid
+		} else {
+			hi = mid - 1
+		}
+	}
+	return string(runes[:lo]) + dots
+}
+
+// Tail returns the longest suffix of s that fits in width. An input field whose
+// caret is always after the last rune wants the end of the line, not its start.
+func (c *Canvas) Tail(s string, width int32) string {
+	if c.Measure(s) <= width {
+		return s
+	}
+
+	runes := []rune(s)
+	// Smallest k where the suffix from k fits: the more we drop, the shorter.
+	lo, hi := 0, len(runes)
+	for lo < hi {
+		mid := (lo + hi) / 2
+		if c.Measure(string(runes[mid:])) <= width {
+			hi = mid
+		} else {
+			lo = mid + 1
+		}
+	}
+	return string(runes[lo:])
 }
 
 // Measure returns the width in pixels of s with the selected font.

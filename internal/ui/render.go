@@ -88,20 +88,31 @@ func (a *App) paintQuery(c *win.Canvas, l layout) {
 
 	caretTop := l.inputTop + a.scale(4)
 	caretBottom := l.inputTop + l.inputH - a.scale(4)
+	caretW := a.scale(2)
+	caretGap := a.scale(5)
 
+	// The caret marks the start of an empty field, so the placeholder begins
+	// after it. Painting both at the same x put the block on top of the "S".
 	if len(a.query) == 0 {
-		c.Text("Search applications", l.pad, y, colorDim)
 		if a.caretOn {
-			c.Fill(win.Rect{Left: l.pad, Top: caretTop, Right: l.pad + a.scale(2), Bottom: caretBottom}, colorAccent)
+			c.Fill(win.Rect{Left: l.pad, Top: caretTop, Right: l.pad + caretW, Bottom: caretBottom}, colorAccent)
 		}
+		c.TextIn("Search applications", win.Rect{
+			Left:   l.pad + caretW + caretGap,
+			Top:    y,
+			Right:  a.width - l.pad,
+			Bottom: y + textH,
+		}, colorDim)
 		return
 	}
 
-	text := string(a.query)
+	// The caret is always after the last rune, so a query wider than the field
+	// shows its tail instead of being cut at the end.
+	text := c.Tail(string(a.query), a.width-l.pad*2-caretW-caretGap)
 	c.Text(text, l.pad, y, colorText)
 	if a.caretOn {
 		x := l.pad + c.Measure(text) + a.scale(1)
-		c.Fill(win.Rect{Left: x, Top: caretTop, Right: x + a.scale(2), Bottom: caretBottom}, colorAccent)
+		c.Fill(win.Rect{Left: x, Top: caretTop, Right: x + caretW, Bottom: caretBottom}, colorAccent)
 	}
 }
 
@@ -166,7 +177,7 @@ func (a *App) paintRow(c *win.Canvas, r core.Result, y int32, l layout, selected
 	x := l.pad + slot + iconGap
 	textY := y + (l.rowH-c.LineHeight())/2
 
-	name := []rune(r.Entry.Name)
+	name := []rune(c.Shorten(r.Entry.Name, a.width-x-l.pad))
 	if len(r.Positions) == 0 {
 		c.Text(string(name), x, textY, colorText)
 		return

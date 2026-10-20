@@ -216,7 +216,12 @@ func (s *Settings) Paint(c *win.Canvas) {
 		}
 		if r.kind == rowHeader {
 			c.UseFont(s.fonts.Footer)
-			c.Text(strings.ToUpper(r.label), pad, y+s.scale(8), colorDim)
+			c.TextIn(strings.ToUpper(r.label), win.Rect{
+				Left:   pad,
+				Top:    y + (r.h-c.LineHeight())/2,
+				Right:  width - pad,
+				Bottom: y + r.h,
+			}, colorDim)
 			continue
 		}
 
@@ -225,8 +230,19 @@ func (s *Settings) Paint(c *win.Canvas) {
 			c.Fill(win.Rect{Left: 0, Top: y, Right: s.scale(3), Bottom: y + r.h}, colorAccent)
 		}
 
+		// Text is centred on the font's own line height rather than on a
+		// hand-tuned offset: the offset used to be 7px, which was already low
+		// for a 16px font and is clearly low for an 18px one.
 		c.UseFont(s.fonts.Row)
-		c.Text(r.label, pad, y+s.scale(7), colorText)
+		textY := y + (r.h-c.LineHeight())/2
+		valueX := pad + s.scale(setValueX)
+		c.TextIn(r.label, win.Rect{
+			Left:   pad,
+			Top:    textY,
+			Right:  valueX - s.scale(8),
+			Bottom: y + r.h,
+		}, colorText)
+
 		if r.value != "" {
 			color := colorText
 			switch r.kind {
@@ -240,7 +256,14 @@ func (s *Settings) Paint(c *win.Canvas) {
 			if i == s.sel && s.armed == i {
 				color = colorError
 			}
-			c.Text(r.value, pad+s.scale(setValueX), y+s.scale(7), color)
+			// A manual app's target is usually longer than the window; ending it
+			// in an ellipsis is the difference between "shortened" and "broken".
+			c.TextIn(r.value, win.Rect{
+				Left:   valueX,
+				Top:    textY,
+				Right:  width - pad,
+				Bottom: y + r.h,
+			}, color)
 		}
 	}
 	restore()
