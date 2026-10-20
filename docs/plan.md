@@ -39,7 +39,7 @@ non-Windows platforms.
 
 | Metric | Budget | Measured |
 |---|---|---|
-| Idle working set, full launcher with 96 apps | ≤ 30 MB | **28.5 MB** hidden with the settings window created · **30 MB** with the settings form on screen |
+| Idle working set, full launcher with 99 apps | ≤ 30 MB | **28.7 MB** hidden (settings window created on first use) · **30 MB** with the settings form on screen |
 | Idle working set, bare shell (P0 spike) | — | **7.7 MB** before first show · **10.8 MB** after two show/hide cycles |
 | Private bytes (spike) | ≤ 30 MB | **12.6 MB** |
 | Boot: `main` → hotkey registered | ≤ 120 ms | **2.6 ms** |

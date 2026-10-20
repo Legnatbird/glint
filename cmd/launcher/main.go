@@ -58,7 +58,7 @@ func main() {
 	run(cfg, *demo, *seconds, *openSettings)
 }
 
-func run(cfg core.Config, demo string, seconds int, openSettings bool) {
+func run(cfg core.Config, demo string, seconds int, startWithSettings bool) {
 	dpi := int32(win.SystemDPI())
 
 	shell, err := win.NewWindow(win.WindowConfig{
@@ -80,13 +80,6 @@ func run(cfg core.Config, demo string, seconds int, openSettings bool) {
 	history, err := core.LoadHistory(historyPath(), cfg.History.MaxEntries)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "history:", err)
-	}
-
-	settingsFonts := win.NewFonts(uint32(dpi))
-	settings, settingsErr := win.NewSettingsWindow("app-launcher settings", 600*dpi/96, 640*dpi/96)
-	if settingsErr != nil {
-		debugf("settings window failed: %v", settingsErr)
-		settings = nil
 	}
 
 	var index atomic.Pointer[core.Index]
@@ -112,20 +105,6 @@ func run(cfg core.Config, demo string, seconds int, openSettings bool) {
 	app.Attach()
 	app.SetSize(shell.ClientSize())
 	app.SetRebuildHandler(func() { scanner.rebuild() })
-	app.SetSettingsHandler(func() {
-		if settings != nil {
-			settings.Show()
-		}
-	})
-
-	shell.OnHotkey(func() {
-		// While the settings window is open it owns the screen.
-		if settings != nil && settings.Visible() {
-			return
-		}
-		app.Toggle()
-	})
-	shell.OnClose(shell.PostQuit)
 
 	hotkey := &hotkeyBinding{shell: shell}
 	if err := hotkey.apply(cfg.Hotkey); err != nil {
@@ -139,28 +118,49 @@ func run(cfg core.Config, demo string, seconds int, openSettings bool) {
 		debugf("autostart error: %v", err)
 	}
 
-	// The form owns every edit; each hook applies one change to the running
-	// process, so nothing here waits for a restart.
-	if settings != nil {
-		debugf("settings window ready hwnd=%d", settings.HWND())
-		ui.NewSettings(settings, &cfg, settingsFonts, ui.SettingsHooks{
-			Save:       func() error { return cfg.Save(configPath()) },
-			Hotkey:     hotkey.apply,
-			HotkeyLock: hotkey.lock,
-			Backdrop:   func(mode string) error { return applyBackdrop(shell.HWND(), mode, dpi) },
-			Autostart:  win.SetAutostart,
-			MaxResults: app.SetMaxResults,
-			Rescan:     func() { scanner.rebuild() },
-			ClearLog: func() error {
-				history.Clear()
-				return history.Save(historyPath())
-			},
-			Entries: history.Len,
-		})
-		if openSettings {
+	// The settings window is created on first use. A launcher that is never
+	// configured should not pay for a window, its fonts and its handles.
+	var settings *win.SettingsWindow
+	showSettings := func() {
+		if settings == nil {
+			w, err := win.NewSettingsWindow("app-launcher settings", 600*dpi/96, 640*dpi/96)
+			if err != nil {
+				debugf("settings window failed: %v", err)
+				return
+			}
+			settings = w
+			// The form owns every edit; each hook applies one change to the
+			// running process, so nothing here waits for a restart.
+			ui.NewSettings(settings, &cfg, win.NewFonts(uint32(dpi)), ui.SettingsHooks{
+				Save:       func() error { return cfg.Save(configPath()) },
+				Hotkey:     hotkey.apply,
+				HotkeyLock: hotkey.lock,
+				Backdrop:   func(mode string) error { return applyBackdrop(shell.HWND(), mode, dpi) },
+				Autostart:  win.SetAutostart,
+				MaxResults: app.SetMaxResults,
+				Rescan:     func() { scanner.rebuild() },
+				ClearLog: func() error {
+					history.Clear()
+					return history.Save(historyPath())
+				},
+				Entries: history.Len,
+			})
+			debugf("settings window ready hwnd=%d", settings.HWND())
+		}
+		if !settings.Visible() {
 			settings.Show()
 		}
 	}
+	app.SetSettingsHandler(showSettings)
+
+	shell.OnHotkey(func() {
+		// While the settings window is open it owns the screen.
+		if settings != nil && settings.Visible() {
+			return
+		}
+		app.Toggle()
+	})
+	shell.OnClose(shell.PostQuit)
 
 	tray, err := win.NewTray(shell.HWND(), "app-launcher")
 	if err != nil {
@@ -173,9 +173,13 @@ func run(cfg core.Config, demo string, seconds int, openSettings bool) {
 			case win.WmLButtonUp:
 				app.Toggle()
 			case win.WmRButtonUp:
-				showTrayMenu(tray, app, &cfg, scanner, history, shell, settings)
+				showTrayMenu(tray, app, &cfg, scanner, history, shell, showSettings)
 			}
 		})
+	}
+
+	if startWithSettings {
+		showSettings()
 	}
 
 	if demo != "" {
@@ -192,7 +196,7 @@ func run(cfg core.Config, demo string, seconds int, openSettings bool) {
 
 // showTrayMenu runs the context menu. It is called from the window thread, so
 // everything it touches is already on the right thread.
-func showTrayMenu(tray *win.Tray, app *ui.App, cfg *core.Config, scanner *rebuilder, history *core.History, shell *win.Window, settings *win.SettingsWindow) {
+func showTrayMenu(tray *win.Tray, app *ui.App, cfg *core.Config, scanner *rebuilder, history *core.History, shell *win.Window, showSettings func()) {
 	switch tray.Popup([]win.MenuItem{
 		{ID: 1, Label: "Show launcher"},
 		{ID: 2, Label: "Rebuild index"},
@@ -219,9 +223,7 @@ func showTrayMenu(tray *win.Tray, app *ui.App, cfg *core.Config, scanner *rebuil
 		}
 
 	case 5:
-		if settings != nil {
-			settings.Show()
-		}
+		showSettings()
 
 	case 4:
 		if err := history.Save(historyPath()); err != nil {
