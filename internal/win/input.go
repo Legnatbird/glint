@@ -30,5 +30,6 @@ const (
 	KeyDown   = vkDown
 	KeyTab    = vkTab
 	KeyPrior  = vkPrior
+	KeyF5     = 0x74
 	KeyNext   = vkNext
 )

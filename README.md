@@ -13,7 +13,7 @@ Plan and living decisions: [docs/plan.md](docs/plan.md).
   3 000 apps ranked in 0.11 ms.
 - **P2** complete — 217 apps discovered (Start Menu, Store/UWP, App Paths, PATH),
   drawn result list, global hotkey, `.lnk` and UWP launching.
-- P3 next: usage tracking wired to the ranker, tray icon, autostart.
+- **P3** complete — usage history in `history.json`, frecency drives the ranking, tray menu, autostart toggle.
 
 ## Requirements
 
@@ -42,6 +42,7 @@ and shows the launcher on demand.
 | `Shift+Enter` | Launch as administrator |
 | `Ctrl+Enter` | Open the containing folder |
 | `Esc` | Clear the query, then hide |
+| `F5` | Rebuild the index |
 | `F5` | (planned) rebuild the index |
 
 Starting it again toggles the running instance instead of creating a second one.
@@ -57,6 +58,7 @@ defaults, unknown fields are ignored, and an invalid value never breaks startup.
   "max_results": 8,
   "theme": "dark",
   "path_scope": "gui",
+  "autostart": false,
   "custom_folders": ["D:\\Portables"],
   "exclude_folders": [],
   "include_app_paths": true,

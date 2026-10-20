@@ -77,14 +77,29 @@ func TestSearchWithoutMatchReturnsNothing(t *testing.T) {
 	}
 }
 
-func TestSearchEmptyQueryIsDeterministic(t *testing.T) {
+func TestSearchEmptyQueryWithoutHistoryReturnsNothing(t *testing.T) {
 	idx := core.NewIndex(testEntries())
 
-	first := mustSearch(t, idx, core.Query{Text: "", Limit: 3})
-	second := mustSearch(t, idx, core.Query{Text: "", Limit: 3})
+	// A fresh install must not advertise eight random applications.
+	if got := mustSearch(t, idx, core.Query{Text: "", Limit: 3}); len(got) != 0 {
+		t.Fatalf("got %d results on an empty query with no history", len(got))
+	}
+}
 
-	if len(first) != 3 {
-		t.Fatalf("got %d results, want the limit of 3", len(first))
+func TestSearchEmptyQueryIsDeterministic(t *testing.T) {
+	idx := core.NewIndex(testEntries())
+	now := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
+
+	history := core.NewHistory(nil, 100)
+	history.Touch("lnk:chrome", now)
+	history.Touch("lnk:vscode", now)
+
+	q := core.Query{Text: "", Limit: 3, History: history, Now: now}
+	first := mustSearch(t, idx, q)
+	second := mustSearch(t, idx, q)
+
+	if len(first) != 2 {
+		t.Fatalf("got %d results, want the 2 used apps", len(first))
 	}
 	for i := range first {
 		if first[i].Entry.Key != second[i].Entry.Key {

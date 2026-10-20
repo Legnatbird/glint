@@ -95,6 +95,11 @@ func (i *Index) Search(q Query) []Result {
 	if len(qn) == 0 {
 		for c := range i.cands {
 			f := q.History.Score(i.cands[c].entry.Key, now)
+			// An empty query is "what I use", not "everything installed": a
+			// fresh launcher shows nothing instead of eight random apps.
+			if f == 0 {
+				continue
+			}
 			out = insertTop(out, Result{
 				Entry:    i.cands[c].entry,
 				Frecency: f,

@@ -29,6 +29,7 @@ type Config struct {
 	MaxResults      int           `json:"max_results"`
 	Theme           string        `json:"theme"`
 	PathScope       string        `json:"path_scope"`
+	Autostart       bool          `json:"autostart"`
 	CustomFolders   []string      `json:"custom_folders"`
 	ExcludeFolders  []string      `json:"exclude_folders"`
 	IncludeAppPaths bool          `json:"include_app_paths"`
@@ -42,8 +43,7 @@ func DefaultConfig() Config {
 		MaxResults:      8,
 		Theme:           "dark",
 		PathScope:       PathGUI,
-		IncludeAppPaths: true,
-		History:         HistoryConfig{Enabled: true, MaxEntries: 2000},
+		IncludeAppPaths: true, History: HistoryConfig{Enabled: true, MaxEntries: 2000},
 	}
 }
 

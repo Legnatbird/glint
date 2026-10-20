@@ -1,6 +1,6 @@
 # app-launcher — product and engineering plan
 
-Status: **P2 complete** · Updated: 2026-10-20
+Status: **P3 complete** · Updated: 2026-10-20
 
 A Windows-only, keyboard-first launcher that finds and starts applications. It is
 the app-launcher slice of [Wox](https://github.com/Wox-launcher/Wox) rebuilt around
@@ -167,7 +167,7 @@ what keeps matching and ranking testable without a desktop session.
 | **P0** ✅ | Spike: hidden window, global hotkey, self-measurement | Measured budget met with 3× headroom (see table) |
 | **P1** ✅ | `core`: matcher, ranker, config, cache format | 31 test functions green; 3 000 entries in **0.11 ms** |
 | **P2** ✅ | Sources + window + launch | 96 apps found (73 Start Menu, 11 Store, 15 App Paths, 12 PATH after the GUI filter); `.lnk` and UWP both launch; hotkey steals the foreground from another app |
-| **P3** | Frecency, tray, autostart, settings JSON | Restart preserves ranking and settings; tray quits cleanly |
+| **P3** ✅ | Frecency wired to the ranker, `history.json`, tray menu, autostart | Launched apps outrank text matches after a restart (`history.json` round-trips); tray adds, toggles autostart and quits; empty query shows only used apps |
 | **P4** | Polish: icons, DPI, theming, packaging | Budget re-measured; 7-day soak under 20 MB with 0 % idle CPU |
 
 ## Risks

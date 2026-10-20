@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -63,12 +64,33 @@ func run(cfg core.Config, demo string, seconds int) {
 	}
 	defer shell.Destroy()
 
-	var index atomic.Pointer[core.Index]
-	loadIndex(&index, cfg)
+	history, err := core.LoadHistory(historyPath(), cfg.History.MaxEntries)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "history:", err)
+	}
 
-	app := ui.New(shell, cfg, index.Load, nil, launch)
+	var index atomic.Pointer[core.Index]
+	scanner := &rebuilder{index: &index, cfg: cfg}
+	scanner.loadCache()
+	scanner.rebuild()
+
+	launchFn := func(entry core.Entry, mode ui.Mode) error {
+		if err := launch(entry, mode); err != nil {
+			return err
+		}
+		if cfg.History.Enabled {
+			history.Touch(entry.Key, time.Now())
+			if err := history.Save(historyPath()); err != nil {
+				fmt.Fprintln(os.Stderr, "history:", err)
+			}
+		}
+		return nil
+	}
+
+	app := ui.New(shell, cfg, index.Load, history, launchFn)
 	app.Attach()
 	app.SetSize(shell.ClientSize())
+	app.SetRebuildHandler(func() { scanner.rebuild() })
 
 	shell.OnHotkey(app.Toggle)
 	shell.OnClose(shell.PostQuit)
@@ -76,7 +98,30 @@ func run(cfg core.Config, demo string, seconds int) {
 	if hk, err := win.ParseHotkey(cfg.Hotkey); err != nil {
 		fmt.Fprintln(os.Stderr, "hotkey:", err)
 	} else if err := shell.RegisterHotkey(hk); err != nil {
-		fmt.Fprintln(os.Stderr, "hotkey:", err)
+		debugf("hotkey error: %v", err)
+	} else {
+		debugf("hotkey registered: %s", cfg.Hotkey)
+	}
+
+	debugf("autostart=%v", cfg.Autostart)
+	if err := win.SetAutostart(cfg.Autostart); err != nil {
+		debugf("autostart error: %v", err)
+	}
+
+	tray, err := win.NewTray(shell.HWND(), "app-launcher")
+	if err != nil {
+		debugf("tray error: %v", err)
+	} else {
+		debugf("tray added")
+		defer tray.Remove()
+		shell.OnTray(func(msg uint32) {
+			switch msg {
+			case win.WmLButtonUp:
+				app.Toggle()
+			case win.WmRButtonUp:
+				showTrayMenu(tray, app, &cfg, scanner, history, shell)
+			}
+		})
 	}
 
 	if demo != "" {
@@ -91,29 +136,92 @@ func run(cfg core.Config, demo string, seconds int) {
 	}
 }
 
-// loadIndex serves the cached snapshot immediately, then rescans in the
-// background and swaps the result in. The first hotkey never waits for a scan.
-func loadIndex(index *atomic.Pointer[core.Index], cfg core.Config) {
-	if cache, err := core.LoadCache(cachePath()); err == nil && cache.Valid() {
-		index.Store(core.NewIndex(cache.Entries))
+// showTrayMenu runs the context menu. It is called from the window thread, so
+// everything it touches is already on the right thread.
+func showTrayMenu(tray *win.Tray, app *ui.App, cfg *core.Config, scanner *rebuilder, history *core.History, shell *win.Window) {
+	switch tray.Popup([]win.MenuItem{
+		{ID: 1, Label: "Show launcher"},
+		{ID: 2, Label: "Rebuild index"},
+		{ID: 3, Label: "Start with Windows", Checked: win.AutostartEnabled()},
+		{Separator: true},
+		{ID: 4, Label: "Quit"},
+	}) {
+	case 1:
+		app.Show()
+
+	case 2:
+		app.SetStatus("Rebuilding index…")
+		scanner.rebuild()
+
+	case 3:
+		cfg.Autostart = !win.AutostartEnabled()
+		if err := win.SetAutostart(cfg.Autostart); err != nil {
+			fmt.Fprintln(os.Stderr, "autostart:", err)
+			return
+		}
+		if err := cfg.Save(configPath()); err != nil {
+			fmt.Fprintln(os.Stderr, "config:", err)
+		}
+
+	case 4:
+		if err := history.Save(historyPath()); err != nil {
+			fmt.Fprintln(os.Stderr, "history:", err)
+		}
+		tray.Remove()
+		shell.PostQuit()
 	}
+}
+
+// rebuilder owns the index snapshot and guarantees one scan at a time.
+type rebuilder struct {
+	index *atomic.Pointer[core.Index]
+	cfg   core.Config
+
+	mu      sync.Mutex
+	running bool
+}
+
+// loadCache serves the cached snapshot immediately so the first hotkey never
+// waits for a scan.
+func (r *rebuilder) loadCache() {
+	cache, err := core.LoadCache(cachePath())
+	if err == nil && cache.Valid() {
+		r.index.Store(core.NewIndex(cache.Entries))
+	}
+}
+
+// rebuild scans every source off the UI thread and swaps the result in.
+func (r *rebuilder) rebuild() {
+	r.mu.Lock()
+	if r.running {
+		r.mu.Unlock()
+		return
+	}
+	r.running = true
+	r.mu.Unlock()
 
 	go func() {
+		defer func() {
+			r.mu.Lock()
+			r.running = false
+			r.mu.Unlock()
+		}()
+
 		runtime.LockOSThread()
 		release := win.CoInitialize()
 		defer release()
 
 		rep := sources.Scan(sources.Options{
-			CustomFolders:   cfg.CustomFolders,
-			ExcludeFolders:  cfg.ExcludeFolders,
-			PathScope:       cfg.PathScope,
-			IncludeAppPaths: cfg.IncludeAppPaths,
+			CustomFolders:   r.cfg.CustomFolders,
+			ExcludeFolders:  r.cfg.ExcludeFolders,
+			PathScope:       r.cfg.PathScope,
+			IncludeAppPaths: r.cfg.IncludeAppPaths,
 		})
 		if len(rep.Entries) == 0 {
 			return
 		}
 
-		index.Store(core.NewIndex(rep.Entries))
+		r.index.Store(core.NewIndex(rep.Entries))
 
 		cache := core.Cache{Built: time.Now().UTC(), Entries: rep.Entries}
 		if err := cache.Save(cachePath()); err != nil {

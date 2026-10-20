@@ -41,6 +41,7 @@ type Window struct {
 	onChar       func(r rune)
 	onKey        func(key KeyEvent) bool
 	onDeactivate func()
+	onTray       func(msg uint32)
 
 	hiding bool
 
@@ -108,6 +109,11 @@ func wndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 			// the way every launcher dismisses on click-away.
 			if uint32(wParam) == 0 && w.onDeactivate != nil && !w.hiding {
 				w.onDeactivate()
+			}
+			return 0
+		case trayMessage:
+			if w.onTray != nil {
+				w.onTray(uint32(lParam))
 			}
 			return 0
 		case wmDestroy:
@@ -334,6 +340,12 @@ func (w *Window) OnChar(fn func(r rune)) { w.onChar = fn }
 
 // OnKey sets the WM_KEYDOWN handler. Returning true marks the key as handled.
 func (w *Window) OnKey(fn func(KeyEvent) bool) { w.onKey = fn }
+
+// OnTray sets the notification-area callback.
+func (w *Window) OnTray(fn func(msg uint32)) { w.onTray = fn }
+
+// HWND exposes the native handle for the tray icon and shell calls.
+func (w *Window) HWND() uintptr { return w.hwnd }
 
 // OnDeactivate runs when the window loses the foreground.
 func (w *Window) OnDeactivate(fn func()) { w.onDeactivate = fn }

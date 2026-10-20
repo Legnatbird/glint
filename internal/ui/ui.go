@@ -42,6 +42,7 @@ type App struct {
 	visible  bool
 	caretOn  bool
 	status   string
+	rebuild  func()
 	timers   map[uintptr]func()
 }
 
@@ -206,8 +207,27 @@ func (a *App) onKey(k win.KeyEvent) bool {
 	case win.KeyReturn:
 		a.activate(k)
 		return true
+
+	case win.KeyF5:
+		if a.rebuild != nil {
+			a.rebuild()
+			a.status = "Rebuilding index…"
+			a.window.Invalidate()
+		}
+		return true
 	}
 	return false
+}
+
+// SetRebuildHandler installs the callback behind F5 and the tray menu.
+func (a *App) SetRebuildHandler(fn func()) { a.rebuild = fn }
+
+// SetStatus replaces the footer hint until the next query change.
+func (a *App) SetStatus(s string) {
+	a.status = s
+	if a.visible {
+		a.window.Invalidate()
+	}
 }
 
 func (a *App) activate(k win.KeyEvent) {
