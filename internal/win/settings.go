@@ -120,10 +120,15 @@ func NewSettingsWindow(title string, width, height int32) (*SettingsWindow, erro
 
 	cursor, _, _ := procLoadCursorW.Call(0, idcArrow)
 	brush, _, _ := procCreateSolidBrush.Call(uintptr(0x1F1A1A))
+	// The executable carries the launcher's icon as a resource, so the title bar
+	// and Alt+Tab show the same mark as the tray and the settings row.
+	large, small := SelfIcon()
 	wc := wndClassEx{
 		style:         csHDraw | csVDraw,
 		lpfnWndProc:   settingsProc,
 		hInstance:     windows.Handle(hinst),
+		hIcon:         windows.Handle(large),
+		hIconSm:       windows.Handle(small),
 		hCursor:       windows.Handle(cursor),
 		hbrBackground: windows.Handle(brush),
 		lpszClassName: class,

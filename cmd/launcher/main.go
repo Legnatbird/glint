@@ -105,6 +105,9 @@ func run(cfg core.Config, demo string, seconds int, startWithSettings bool) {
 	app.Attach()
 	app.SetSize(shell.ClientSize())
 	app.SetRebuildHandler(func() { scanner.rebuild() })
+	if exe, err := os.Executable(); err == nil {
+		app.SetSelfPath(exe)
+	}
 
 	hotkey := &hotkeyBinding{shell: shell}
 	if err := hotkey.apply(cfg.Hotkey); err != nil {

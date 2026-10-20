@@ -14,7 +14,7 @@ Plan and living decisions: [docs/plan.md](docs/plan.md).
 - **P2** complete — 217 apps discovered (Start Menu, Store/UWP, App Paths, PATH),
   drawn result list, global hotkey, `.lnk` and UWP launching.
 - **P3** complete — usage history in `history.json`, frecency drives the ranking, tray menu, autostart toggle.
-- **P4** complete — app icons (shell and Store apps), acrylic backdrop, rounded corners, 3.4 MB binary.
+- **P4** complete — app icons (shell and Store apps), acrylic backdrop, rounded corners, the launcher's own icon embedded in the executable.
 - **P5** complete — settings window: editable controls that apply live, no restart.
 
 ## Requirements
@@ -129,11 +129,20 @@ go run ./cmd/spike
 ## Layout
 
 ```
-cmd/launcher      the app: window, hotkey, wiring
+cmd/launcher      the app: window, hotkey, wiring; rsrc.syso carries the icon
 cmd/spike         P0 measurement harness
+internal/art      the launcher's mark, rasterized in pure Go
 internal/win      the only package allowed to call Win32 (COM, GDI, shell)
 internal/sources  Start Menu, Store/UWP, App Paths and PATH scanners
 internal/core     matching, ranking, config, cache (no Win32)
 internal/ui       launcher state machine and painting
+tools/icongen     renders assets/launcher.ico from internal/art
 docs/plan.md      product and engineering plan
 ```
+
+## Icon
+
+The mark (a rounded accent panel with a white chevron) is drawn in code, once, in
+`internal/art`. The tray, the settings row, the settings title bar and the
+executable's own shell icon all come from that one buffer — see
+[assets/README.md](assets/README.md) for how the `.ico` is generated and embedded.

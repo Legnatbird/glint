@@ -56,6 +56,7 @@ type App struct {
 	status   string
 	rebuild  func()
 	open     func() // opens the settings window
+	selfPath string // the launcher executable, icon source for the settings row
 	timers   map[uintptr]func()
 }
 
@@ -177,7 +178,11 @@ func (a *App) refresh() {
 	// The settings window is reachable by typing its name, the way every other
 	// row is reachable: one list, one keyboard model, no hidden menu.
 	if a.open != nil && wantsSettings(query) {
-		row := core.Result{Entry: core.Entry{Name: "Settings", Key: settingsKey}, Score: 1}
+		row := core.Result{Entry: core.Entry{
+			Name:     "Settings",
+			Key:      settingsKey,
+			IconPath: a.selfPath,
+		}, Score: 1}
 		results = append([]core.Result{row}, results...)
 		if len(results) > a.config.MaxResults {
 			results = results[:a.config.MaxResults]
@@ -287,6 +292,11 @@ func (a *App) SetRebuildHandler(fn func()) { a.rebuild = fn }
 
 // SetSettingsHandler installs what the synthetic Settings row opens.
 func (a *App) SetSettingsHandler(fn func()) { a.open = fn }
+
+// SetSelfPath tells the app where its own executable lives. The settings row
+// borrows the icon embedded in it, so the launcher never carries a second copy
+// of its own mark in memory.
+func (a *App) SetSelfPath(path string) { a.selfPath = path }
 
 // SetStatus replaces the footer hint until the next query change.
 func (a *App) SetStatus(s string) {
