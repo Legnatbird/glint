@@ -39,7 +39,7 @@ non-Windows platforms.
 
 | Metric | Budget | Measured |
 |---|---|---|
-| Idle working set, full launcher with 96 apps | ≤ 30 MB | **24.5 MB** hidden · **27.5 MB** with icons on screen |
+| Idle working set, full launcher with 96 apps | ≤ 30 MB | **28.5 MB** hidden with the settings window created · **30 MB** with the settings form on screen |
 | Idle working set, bare shell (P0 spike) | — | **7.7 MB** before first show · **10.8 MB** after two show/hide cycles |
 | Private bytes (spike) | ≤ 30 MB | **12.6 MB** |
 | Boot: `main` → hotkey registered | ≤ 120 ms | **2.6 ms** |
@@ -49,10 +49,11 @@ non-Windows platforms.
 | Search over 3 000 entries | ≤ 1 ms | **0.11 ms**, 2 KB allocated per query |
 | CPU, whole 6 s spike run incl. startup and 2 paints | — | **~16 ms total** (0.0 % steady state) |
 | OS threads | ≤ 16 | **13** |
-| Kernel handles | ≤ 500 | **375** idle · **452** after the first icon extraction |
+| Kernel handles | ≤ 500 | **388** idle · **452** after the first icon extraction · **414** with the settings window |
 | GDI objects | ≤ 60 | **8** (before icons) |
 | Icon extraction (first time only) | — | **+2.4 MB private, +76 handles**, then flat |
-| Binary size | ≤ 15 MB | **3.0 MB** |
+| Shell folder dialog, transient | — | **+12 MB working set, +150 handles** while a picker is open; the shell keeps them cached in-process afterwards |
+| Binary size | ≤ 15 MB | **3.4 MB** |
 | Processes | 1 | **1** |
 | Network connections | 0 | **0** |
 
@@ -170,23 +171,30 @@ what keeps matching and ranking testable without a desktop session.
 | **P2** ✅ | Sources + window + launch | 96 apps found (73 Start Menu, 11 Store, 15 App Paths, 12 PATH after the GUI filter); `.lnk` and UWP both launch; hotkey steals the foreground from another app |
 | **P3** ✅ | Frecency wired to the ranker, `history.json`, tray menu, autostart | Launched apps outrank text matches after a restart (`history.json` round-trips); tray adds, toggles autostart and quits; empty query shows only used apps |
 | **P4** 🚧 | Polish: icons ✅, acrylic ✅, tray icon | Single-monitor target: per-monitor DPI changes are out of scope and `WM_DPICHANGED` is not handled |
+| **P5** ✅ | Settings window: editable controls, live apply | Every control in the table below edits `config.json` and reaches the running launcher without a restart; the hotkey is released while a combination is recorded |
 
 ## P5 — settings window
 
-Decided: a **separate window** (own overlap window, title bar, resizable), not an
-overlay inside the launcher popup, and changes apply **live** while editing.
+Built as decided: a **separate window** (own overlap window, title bar, resizable),
+not an overlay inside the launcher popup, and changes apply **live** while editing.
 
-| Section | Controls |
-|---|---|
-| General | hotkey capture, `max_results`, `backdrop`, autostart |
-| Sources | `custom_folders` list with Add (IFileOpenDialog + FOS_PICKFOLDERS) and Remove; `exclude_folders` |
-| Manual apps | `manual_apps` table: name, target, args, icon |
-| History | record count and a clear button |
+| Section | Controls | State |
+|---|---|---|
+| General | hotkey capture, `max_results`, `backdrop`, autostart | ✅ |
+| Sources | `custom_folders` and `exclude_folders` with Add (`IFileOpenDialog` + `FOS_PICKFOLDERS`) and Remove; `path_scope` | ✅ |
+| Manual apps | add with the file picker, list, remove | ✅ name defaults to the file stem; args and icon stay config-only for now |
+| History | record count and a clear action | ✅ |
+
+The form has no child controls: rows are painted and hit-tested directly, so the
+window adds no handle per control and the program keeps a single painting model.
+Rows carry a step or an action; destructive rows arm on the first `Enter` and act
+on the second.
 
 Rules it has to respect:
 
 - While the settings window is open the global hotkey must not raise the launcher over it.
 - Saving keeps using `Config.Save` (atomic); live apply means each edit triggers a rescan through the same `rebuilder`, never a restart.
+
 - Entry points: the tray menu and a synthetic `Launcher settings` row that matches `settings`, `config` and `ajustes`.
 - The window is a second `Window` instance; `internal/win` already owns the class registration, so it needs a class variant with `WS_OVERLAPPEDWINDOW` and a normal (non-topmost) style.
 

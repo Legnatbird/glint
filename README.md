@@ -14,6 +14,8 @@ Plan and living decisions: [docs/plan.md](docs/plan.md).
 - **P2** complete — 217 apps discovered (Start Menu, Store/UWP, App Paths, PATH),
   drawn result list, global hotkey, `.lnk` and UWP launching.
 - **P3** complete — usage history in `history.json`, frecency drives the ranking, tray menu, autostart toggle.
+- **P4** complete — app icons (shell and Store apps), acrylic backdrop, rounded corners, 3.4 MB binary.
+- **P5** complete — settings window: editable controls that apply live, no restart.
 
 ## Requirements
 
@@ -43,9 +45,35 @@ and shows the launcher on demand.
 | `Ctrl+Enter` | Open the containing folder |
 | `Esc` | Clear the query, then hide |
 | `F5` | Rebuild the index |
-| `F5` | (planned) rebuild the index |
+
+Typing `set` (or `con`, `aju`, `pref`) puts a **Settings** row on top of the list;
+so does the tray menu. Both open the settings window.
 
 Starting it again toggles the running instance instead of creating a second one.
+
+## Settings window
+
+One column of rows, keyboard first:
+
+| Key | Action |
+|---|---|
+| `↑` `↓` `Tab` | Move between rows |
+| `←` `→` | Change a value (`max_results`, backdrop, PATH scope) |
+| `Enter` `Space` | Activate: record a hotkey, toggle, pick a folder, clear |
+| `Esc` | Close |
+
+Every edit is saved to `config.json` and pushed to the running launcher at once:
+
+| Row | What happens immediately |
+|---|---|
+| Hotkey | The new combination is registered. While recording, the old one is released so the keystroke reaches the window. If Windows refuses the combination, the previous one comes back and the reason shows in the footer. |
+| Max results | The launcher list reflows to the new limit. |
+| Backdrop | The launcher window switches between acrylic and solid in place. |
+| Start with Windows | The `Run` key entry is written or removed. |
+| PATH scope, folders, manual apps | The index rescans in the background through the same single-flight rebuilder the hotkey uses. |
+
+Destructive rows (a folder, a manual app, the history) ask twice: the first
+`Enter` or `Delete` arms the row, the second one acts.
 
 ## Configuration
 
