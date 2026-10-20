@@ -58,6 +58,7 @@ defaults, unknown fields are ignored, and an invalid value never breaks startup.
   "max_results": 8,
   "theme": "dark",
   "path_scope": "gui",
+  "backdrop": "acrylic",
   "autostart": false,
   "custom_folders": ["D:\\Portables"],
   "exclude_folders": [],
@@ -75,6 +76,10 @@ defaults, unknown fields are ignored, and an invalid value never breaks startup.
 | `"off"` | Ignore PATH entirely. |
 
 Windows system folders and the `WindowsApps` alias stubs are always skipped.
+
+`backdrop` is `"acrylic"` (default) or `"solid"`. Acrylic goes through
+`SetWindowCompositionAttribute`, an API Microsoft never documented; if the call
+fails the launcher silently keeps the solid background.
 
 ## Inspect what it found
 

@@ -23,6 +23,9 @@ type WindowConfig struct {
 	Width      int32
 	Height     int32
 	Background uint32
+	// Layered is required for the acrylic backdrop: it lets the DWM blur and
+	// the painted content composite instead of one covering the other.
+	Layered bool
 }
 
 // Window is a borderless, topmost shell window with a message loop.
@@ -211,8 +214,13 @@ func NewWindow(cfg WindowConfig) (*Window, error) {
 	x := (int32(screenW) - cfg.Width) / 2
 	y := (int32(screenH) - cfg.Height) / 3
 
+	exStyle := uint32(wsExToolWindow | wsExTopmost)
+	if cfg.Layered {
+		exStyle |= wsExLayered
+	}
+
 	hwnd, _, createErr := procCreateWindowExW.Call(
-		uintptr(wsExToolWindow|wsExTopmost),
+		uintptr(exStyle),
 		uintptr(unsafe.Pointer(className)),
 		uintptr(unsafe.Pointer(title)),
 		uintptr(wsPopup|wsClipChildren),

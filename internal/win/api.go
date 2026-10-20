@@ -54,6 +54,7 @@ const (
 
 	wsExToolWindow = 0x00000080
 	wsExTopmost    = 0x00000008
+	wsExLayered    = 0x00080000
 
 	wmDestroy    = 0x0002
 	wmActivate   = 0x0006

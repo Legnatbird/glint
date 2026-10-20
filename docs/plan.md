@@ -169,7 +169,7 @@ what keeps matching and ranking testable without a desktop session.
 | **P1** ✅ | `core`: matcher, ranker, config, cache format | 31 test functions green; 3 000 entries in **0.11 ms** |
 | **P2** ✅ | Sources + window + launch | 96 apps found (73 Start Menu, 11 Store, 15 App Paths, 12 PATH after the GUI filter); `.lnk` and UWP both launch; hotkey steals the foreground from another app |
 | **P3** ✅ | Frecency wired to the ranker, `history.json`, tray menu, autostart | Launched apps outrank text matches after a restart (`history.json` round-trips); tray adds, toggles autostart and quits; empty query shows only used apps |
-| **P4** 🚧 | Polish: icons ✅, backdrop, DPI, packaging | Icons cost a one-time shell init and nothing per row; budget re-measured |
+| **P4** 🚧 | Polish: icons ✅, acrylic ✅, DPI, packaging | Acrylic needs a layered window and a 91% tint to stay readable; solid remains the fallback |
 
 ## Risks
 

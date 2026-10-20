@@ -15,6 +15,12 @@ type HistoryConfig struct {
 	MaxEntries int  `json:"max_entries"`
 }
 
+// Backdrop modes.
+const (
+	BackdropSolid   = "solid"
+	BackdropAcrylic = "acrylic"
+)
+
 // Path scopes for scanning the PATH environment variable.
 const (
 	PathOff = "off" // ignore PATH entirely
@@ -29,6 +35,7 @@ type Config struct {
 	MaxResults      int           `json:"max_results"`
 	Theme           string        `json:"theme"`
 	PathScope       string        `json:"path_scope"`
+	Backdrop        string        `json:"backdrop"`
 	Autostart       bool          `json:"autostart"`
 	CustomFolders   []string      `json:"custom_folders"`
 	ExcludeFolders  []string      `json:"exclude_folders"`
@@ -43,6 +50,7 @@ func DefaultConfig() Config {
 		MaxResults:      8,
 		Theme:           "dark",
 		PathScope:       PathGUI,
+		Backdrop:        BackdropAcrylic,
 		IncludeAppPaths: true, History: HistoryConfig{Enabled: true, MaxEntries: 2000},
 	}
 }
@@ -115,6 +123,12 @@ func (c *Config) Normalize() {
 	case "dark", "light", "system":
 	default:
 		c.Theme = defaults.Theme
+	}
+
+	switch c.Backdrop {
+	case BackdropSolid, BackdropAcrylic:
+	default:
+		c.Backdrop = defaults.Backdrop
 	}
 
 	switch c.PathScope {

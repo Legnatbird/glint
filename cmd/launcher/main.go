@@ -65,11 +65,25 @@ func run(cfg core.Config, demo string, seconds int) {
 		Width:      660 * dpi / 96,
 		Height:     430 * dpi / 96,
 		Background: ui.ColorBackground,
+		Layered:    cfg.Backdrop == core.BackdropAcrylic,
 	})
 	if err != nil {
 		fatal(err)
 	}
 	defer shell.Destroy()
+
+	if cfg.Backdrop == core.BackdropAcrylic {
+		if err := win.RoundCorners(shell.HWND(), 10*dpi/96); err != nil {
+			debugf("rounded corners: %v", err)
+		}
+		// AABBGGRR: dark tint at 91% alpha. The tint is what controls how much
+		// of the blurred desktop reaches the eye; the paint stays opaque.
+		if err := win.EnableAcrylic(shell.HWND(), 0xE8161212, 255); err != nil {
+			debugf("acrylic: %v", err)
+		} else {
+			debugf("acrylic enabled")
+		}
+	}
 
 	history, err := core.LoadHistory(historyPath(), cfg.History.MaxEntries)
 	if err != nil {
