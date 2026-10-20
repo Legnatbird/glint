@@ -94,7 +94,13 @@ func NewTray(hwnd uintptr, tooltip string) (*Tray, error) {
 		return nil, fmt.Errorf("win: NOTIFYICONDATAW layout is %d bytes, expected %d", size, notifyIconDataSize)
 	}
 
-	icon, _, _ := procLoadIconW.Call(0, idiApplication)
+	icon := uintptr(0)
+	if own, err := AppIcon(32); err == nil {
+		icon = uintptr(own.h)
+	}
+	if icon == 0 {
+		icon, _, _ = procLoadIconW.Call(0, idiApplication)
+	}
 
 	t := &Tray{hwnd: hwnd}
 	t.data.cbSize = uint32(unsafe.Sizeof(t.data))
