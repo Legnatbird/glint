@@ -19,12 +19,22 @@ var (
 type SettingsWindow struct {
 	hwnd    uintptr
 	visible bool
+	onPaint func(*Canvas)
 	clsDone bool
 	clsErr  error
 }
 
 func settingsWndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 	switch uint32(msg) {
+	case wmPaint:
+		var ps paintStruct
+		hdc, _, _ := procBeginPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
+		if settingsWindow != nil && settingsWindow.onPaint != nil && hdc != 0 {
+			settingsWindow.onPaint(&Canvas{hdc: hdc})
+		}
+		procEndPaint.Call(hwnd, uintptr(unsafe.Pointer(&ps)))
+		return 0
+
 	case wmEraseBkgnd:
 		return 1
 	case wmClose:
@@ -92,6 +102,12 @@ func (w *SettingsWindow) Hide() {
 	w.visible = false
 	procShowWindow.Call(w.hwnd, swHide)
 }
+
+// OnPaint installs the paint callback.
+func (w *SettingsWindow) OnPaint(fn func(*Canvas)) { w.onPaint = fn }
+
+// HWND exposes the handle for logging and tests.
+func (w *SettingsWindow) HWND() uintptr { return w.hwnd }
 
 // Visible reports whether it is on screen.
 func (w *SettingsWindow) Visible() bool { return w != nil && w.visible }

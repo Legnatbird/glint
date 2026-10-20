@@ -30,6 +30,7 @@ func main() {
 	dump := flag.Bool("dump", false, "print the discovered applications and exit")
 	demo := flag.String("demo", "", "open the launcher with this query and exit after -seconds")
 	seconds := flag.Int("seconds", 0, "with -demo: how long to stay on screen")
+	openSettings := flag.Bool("settings", false, "open the settings window at startup")
 	flag.Parse()
 
 	// The message loop and every COM call must live on this thread.
@@ -54,10 +55,10 @@ func main() {
 		return
 	}
 
-	run(cfg, *demo, *seconds)
+	run(cfg, *demo, *seconds, *openSettings)
 }
 
-func run(cfg core.Config, demo string, seconds int) {
+func run(cfg core.Config, demo string, seconds int, openSettings bool) {
 	dpi := int32(win.SystemDPI())
 
 	shell, err := win.NewWindow(win.WindowConfig{
@@ -90,6 +91,18 @@ func run(cfg core.Config, demo string, seconds int) {
 		fmt.Fprintln(os.Stderr, "history:", err)
 	}
 
+	settingsFonts := win.NewFonts(uint32(dpi))
+	settings, settingsErr := win.NewSettingsWindow("app-launcher settings", 560*dpi/96, 420*dpi/96)
+	if settingsErr != nil {
+		debugf("settings window failed: %v", settingsErr)
+	} else {
+		debugf("settings window ready hwnd=%d", settings.HWND())
+		settings.OnPaint(func(c *win.Canvas) { drawSettings(c, settingsFonts, cfg) })
+		if openSettings {
+			settings.Show()
+		}
+	}
+
 	var index atomic.Pointer[core.Index]
 	scanner := &rebuilder{index: &index, cfg: cfg}
 	scanner.loadCache()
@@ -114,7 +127,13 @@ func run(cfg core.Config, demo string, seconds int) {
 	app.SetSize(shell.ClientSize())
 	app.SetRebuildHandler(func() { scanner.rebuild() })
 
-	shell.OnHotkey(app.Toggle)
+	shell.OnHotkey(func() {
+		// While the settings window is open it owns the screen.
+		if settings != nil && settings.Visible() {
+			return
+		}
+		app.Toggle()
+	})
 	shell.OnClose(shell.PostQuit)
 
 	if hk, err := win.ParseHotkey(cfg.Hotkey); err != nil {
@@ -141,7 +160,7 @@ func run(cfg core.Config, demo string, seconds int) {
 			case win.WmLButtonUp:
 				app.Toggle()
 			case win.WmRButtonUp:
-				showTrayMenu(tray, app, &cfg, scanner, history, shell)
+				showTrayMenu(tray, app, &cfg, scanner, history, shell, settings)
 			}
 		})
 	}
@@ -160,7 +179,7 @@ func run(cfg core.Config, demo string, seconds int) {
 
 // showTrayMenu runs the context menu. It is called from the window thread, so
 // everything it touches is already on the right thread.
-func showTrayMenu(tray *win.Tray, app *ui.App, cfg *core.Config, scanner *rebuilder, history *core.History, shell *win.Window) {
+func showTrayMenu(tray *win.Tray, app *ui.App, cfg *core.Config, scanner *rebuilder, history *core.History, shell *win.Window, settings *win.SettingsWindow) {
 	switch tray.Popup([]win.MenuItem{
 		{ID: 1, Label: "Show launcher"},
 		{ID: 2, Label: "Rebuild index"},
@@ -187,8 +206,8 @@ func showTrayMenu(tray *win.Tray, app *ui.App, cfg *core.Config, scanner *rebuil
 		}
 
 	case 5:
-		if err := win.ShellExecute(configPath(), "", "", false); err != nil {
-			fmt.Fprintln(os.Stderr, "settings:", err)
+		if settings != nil {
+			settings.Show()
 		}
 
 	case 4:
@@ -350,4 +369,24 @@ func wantsDump(args []string) bool {
 		}
 	}
 	return false
+}
+
+// drawSettings paints the read-only scaffold of the settings window.
+func drawSettings(c *win.Canvas, fonts *win.Fonts, cfg core.Config) {
+	c.Fill(win.Rect{Left: 0, Top: 0, Right: 4000, Bottom: 4000}, ui.ColorBackground)
+	c.UseFont(fonts.Query)
+	c.Text("Settings", 24, 18, 0xF1ECEC)
+	c.UseFont(fonts.Row)
+	lines := []string{
+		fmt.Sprintf("Hotkey:         %s", cfg.Hotkey),
+		fmt.Sprintf("Max results:    %d", cfg.MaxResults),
+		fmt.Sprintf("Backdrop:       %s", cfg.Backdrop),
+		fmt.Sprintf("PATH scope:     %s", cfg.PathScope),
+		fmt.Sprintf("Custom folders: %d", len(cfg.CustomFolders)),
+		fmt.Sprintf("Manual apps:    %d", len(cfg.ManualApps)),
+		fmt.Sprintf("Autostart:      %v", cfg.Autostart),
+	}
+	for i, line := range lines {
+		c.Text(line, 24, 64+int32(i)*26, 0xD6D6DE)
+	}
 }
