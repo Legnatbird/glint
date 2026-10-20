@@ -94,3 +94,60 @@ func TestClampByte(t *testing.T) {
 		}
 	}
 }
+
+// UWP logos arrive with uneven transparent padding; trimming gives every icon
+// the same optical weight in a row.
+func TestTrimToContentFillsTheFrame(t *testing.T) {
+	const size = 32
+
+	// A 16x16 square in the middle of a 32x32 canvas, like a tile with padding.
+	padded := solid(size, 0, 0, 0, 0)
+	for y := int32(8); y < 24; y++ {
+		for x := int32(8); x < 24; x++ {
+			offset := (y*size + x) * 4
+			padded[offset], padded[offset+1], padded[offset+2], padded[offset+3] = 200, 100, 50, 255
+		}
+	}
+
+	trimmed := trimToContent(padded, size)
+	if &trimmed[0] == &padded[0] {
+		t.Fatal("padded artwork was not trimmed")
+	}
+
+	// The artwork now reaches the edges: the old 1px border was transparent and
+	// the middle of the old 8px padding is now inside the tile.
+	for _, p := range [][2]int32{{1, 1}, {size - 2, size - 2}, {size / 2, 1}, {1, size / 2}} {
+		if a := trimmed[(p[1]*size+p[0])*4+3]; a < 200 {
+			t.Errorf("(%d,%d) alpha = %d, want the artwork to fill the frame", p[0], p[1], a)
+		}
+	}
+}
+
+func TestTrimToContentLeavesFullArtworkAlone(t *testing.T) {
+	const size = 16
+	full := solid(size, 30, 30, 30, 255)
+	if got := trimToContent(full, size); &got[0] != &full[0] {
+		t.Error("artwork that already fills the frame was resampled")
+	}
+}
+
+// Straight-alpha interpolation drags transparent black into glyph edges; the
+// sampler must interpolate premultiplied.
+func TestSampleBilinearDoesNotDarkenEdges(t *testing.T) {
+	const size = 4
+	pixels := solid(size, 0, 0, 0, 0)
+	// Column 1 is opaque white, the rest transparent.
+	for y := int32(0); y < size; y++ {
+		offset := (y*size + 1) * 4
+		pixels[offset], pixels[offset+1], pixels[offset+2], pixels[offset+3] = 255, 255, 255, 255
+	}
+
+	// Halfway between the white column and an empty one.
+	sample := sampleBilinear(pixels, size, 1.5, 2.0)
+	if sample[0] < 240 || sample[1] < 240 || sample[2] < 240 {
+		t.Fatalf("edge sample = %v, want a white colour rather than grey", sample[:3])
+	}
+	if sample[3] < 100 || sample[3] > 160 {
+		t.Fatalf("edge alpha = %v, want about half", sample[3])
+	}
+}

@@ -18,10 +18,9 @@ import (
 //
 // AlphaBlend is the obvious answer, but on this Windows build it rejects these
 // surfaces with ERROR_INVALID_PARAMETER even for a plain DDB-to-DDB copy, so the
-// pixels stay in Go: resample, composite over the row background (784 pixels, a
-// few microseconds) and stretch the result to the screen in one StretchDIBits
-// call. Deterministic, and nothing depends on a blending path that cannot be
-// debugged from here.
+// pixels stay in Go: trim, resample, composite over the row background and
+// stretch the result to the screen in one StretchDIBits call. Deterministic, and
+// nothing depends on a blending path that cannot be debugged from here.
 
 var (
 	procStretchDIBits  = gdi32.NewProc("StretchDIBits")
@@ -92,46 +91,12 @@ func (p *iconPixels) composite(out []byte, dst int, bg uint32) {
 	bgG := byte(bg >> 8)
 	bgR := byte(bg)
 
-	src := int(p.size)
-	scale := float64(src) / float64(dst)
-
+	scale := float64(p.size) / float64(dst)
 	for dy := 0; dy < dst; dy++ {
-		// Bilinear sampling: the shell hands out 32 px and a row draws 28;
-		// nearest-neighbour bites chunks out of icon art at that ratio.
-		syf := (float64(dy)+0.5)*scale - 0.5
-		y0 := int(math.Floor(syf))
-		fy := syf - float64(y0)
-		if y0 < 0 {
-			y0, fy = 0, 0
-		}
-		y1 := y0 + 1
-		if y1 >= src {
-			y1 = src - 1
-		}
-
+		sy := (float64(dy)+0.5)*scale - 0.5
 		for dx := 0; dx < dst; dx++ {
-			sxf := (float64(dx)+0.5)*scale - 0.5
-			x0 := int(math.Floor(sxf))
-			fx := sxf - float64(x0)
-			if x0 < 0 {
-				x0, fx = 0, 0
-			}
-			x1 := x0 + 1
-			if x1 >= src {
-				x1 = src - 1
-			}
-
-			top := (y0*src + x0) * 4
-			topRight := (y0*src + x1) * 4
-			bottom := (y1*src + x0) * 4
-			bottomRight := (y1*src + x1) * 4
-
-			var sample [4]float64
-			for ch := 0; ch < 4; ch++ {
-				topMix := float64(p.bgra[top+ch])*(1-fx) + float64(p.bgra[topRight+ch])*fx
-				bottomMix := float64(p.bgra[bottom+ch])*(1-fx) + float64(p.bgra[bottomRight+ch])*fx
-				sample[ch] = topMix*(1-fy) + bottomMix*fy
-			}
+			sx := (float64(dx)+0.5)*scale - 0.5
+			sample := sampleBilinear(p.bgra, p.size, sx, sy)
 
 			// RGB is pre-blended over the row colour, which is what a solid
 			// window blits. The alpha channel is carried through unchanged: on
@@ -148,6 +113,134 @@ func (p *iconPixels) composite(out []byte, dst int, bg uint32) {
 	}
 }
 
+// trimToContent scales the artwork so it fills the icon box.
+//
+// A packaged app's logo is authored on a 32px canvas with padding, and the
+// padding is not uniform: Terminal's tile covers about 28 of those pixels while a
+// glyph such as Character Map's fills the frame, so in a row the first reads as a
+// smaller icon. The transparent border is trimmed and the content re-scaled to
+// fill, which puts every icon on the same optical footing.
+func trimToContent(pixels []byte, size int32) []byte {
+	minX, minY, maxX, maxY := contentBounds(pixels, size)
+	if maxX < minX || maxY < minY {
+		return pixels // nothing visible
+	}
+
+	w := maxX - minX + 1
+	h := maxY - minY + 1
+	if w >= size-1 && h >= size-1 {
+		return pixels // already fills the frame
+	}
+
+	out := make([]byte, len(pixels))
+	span := w
+	if h > span {
+		span = h
+	}
+	scale := float64(size) / float64(span)
+	offX := (float64(size) - float64(w)*scale) / 2
+	offY := (float64(size) - float64(h)*scale) / 2
+
+	for dy := int32(0); dy < size; dy++ {
+		sy := float64(minY) + (float64(dy)+0.5-offY)/scale - 0.5
+		for dx := int32(0); dx < size; dx++ {
+			sx := float64(minX) + (float64(dx)+0.5-offX)/scale - 0.5
+			sample := sampleBilinear(pixels, size, sx, sy)
+			offset := (dy*size + dx) * 4
+			out[offset+0] = clampByte(sample[0])
+			out[offset+1] = clampByte(sample[1])
+			out[offset+2] = clampByte(sample[2])
+			out[offset+3] = clampByte(sample[3])
+		}
+	}
+	return out
+}
+
+// contentBounds returns the box that holds every pixel that is not fully
+// transparent, in exclusive-max coordinates.
+func contentBounds(pixels []byte, size int32) (minX, minY, maxX, maxY int32) {
+	minX, minY = size, size
+	maxX, maxY = -1, -1
+
+	const visible = 8 // ignore the faint antialiasing at the very edge
+	for y := int32(0); y < size; y++ {
+		for x := int32(0); x < size; x++ {
+			if pixels[(y*size+x)*4+3] <= visible {
+				continue
+			}
+			if x < minX {
+				minX = x
+			}
+			if y < minY {
+				minY = y
+			}
+			if x > maxX {
+				maxX = x
+			}
+			if y > maxY {
+				maxY = y
+			}
+		}
+	}
+	return minX, minY, maxX, maxY
+}
+
+// sampleBilinear reads the colour at fractional pixel (fx, fy).
+//
+// Interpolation happens in premultiplied space: sampling straight alpha would
+// drag the colour of transparent pixels (black) into the edges of a glyph and
+// leave a dark fringe around every icon.
+func sampleBilinear(pixels []byte, size int32, fx, fy float64) [4]float64 {
+	last := float64(size - 1)
+	fx = math.Max(0, math.Min(last, fx))
+	fy = math.Max(0, math.Min(last, fy))
+
+	x0 := int32(math.Floor(fx))
+	y0 := int32(math.Floor(fy))
+	fracX := fx - float64(x0)
+	fracY := fy - float64(y0)
+
+	x1, y1 := x0+1, y0+1
+	if x1 >= size {
+		x1 = size - 1
+	}
+	if y1 >= size {
+		y1 = size - 1
+	}
+
+	type premul struct{ b, g, r, a float64 }
+	load := func(x, y int32) premul {
+		offset := (y*size + x) * 4
+		a := float64(pixels[offset+3])
+		scale := a / 255
+		return premul{
+			b: float64(pixels[offset+0]) * scale,
+			g: float64(pixels[offset+1]) * scale,
+			r: float64(pixels[offset+2]) * scale,
+			a: a,
+		}
+	}
+
+	p00, p10 := load(x0, y0), load(x1, y0)
+	p01, p11 := load(x0, y1), load(x1, y1)
+
+	mix := func(a, b float64) float64 { return a*(1-fracX) + b*fracX }
+	topB, topG, topR, topA := mix(p00.b, p10.b), mix(p00.g, p10.g), mix(p00.r, p10.r), mix(p00.a, p10.a)
+	botB, botG, botR, botA := mix(p01.b, p11.b), mix(p01.g, p11.g), mix(p01.r, p11.r), mix(p01.a, p11.a)
+
+	outA := topA*(1-fracY) + botA*fracY
+	outB := topB*(1-fracY) + botB*fracY
+	outG := topG*(1-fracY) + botG*fracY
+	outR := topR*(1-fracY) + botR*fracY
+
+	if outA <= 0 {
+		return [4]float64{0, 0, 0, 0}
+	}
+	// Back to straight alpha for the caller.
+	inv := 255 / outA
+	return [4]float64{outB * inv, outG * inv, outR * inv, outA}
+}
+
 func clampByte(v float64) byte {
 	switch {
 	case v <= 0:
@@ -159,7 +252,7 @@ func clampByte(v float64) byte {
 	}
 }
 
-// blitDIB copies an opaque BGRA buffer onto the canvas at (x, y).
+// blitDIB copies a BGRA buffer onto the canvas at (x, y).
 func blitDIB(c *Canvas, pixels []byte, size int, x, y int32) {
 	info := bitmapInfo{}
 	info.header = bitmapInfoHeader{

@@ -48,16 +48,17 @@ type App struct {
 	width, height int32
 	dpi           int32
 
-	query    []rune
-	results  []core.Result
-	selected int
-	visible  bool
-	caretOn  bool
-	status   string
-	rebuild  func()
-	open     func() // opens the settings window
-	selfPath string // the launcher executable, icon source for the settings row
-	timers   map[uintptr]func()
+	query     []rune
+	results   []core.Result
+	selected  int
+	visible   bool
+	caretOn   bool
+	status    string
+	rebuild   func()
+	open      func() // opens the settings window
+	indexSeen *core.Index
+	selfPath  string // the launcher executable, icon source for the settings row
+	timers    map[uintptr]func()
 }
 
 // New builds the app around an existing window. index is a getter so the
@@ -166,6 +167,13 @@ func (a *App) refresh() {
 	if idx == nil {
 		a.results = nil
 		return
+	}
+	// A finished scan brings icons that did not exist when the window first
+	// painted (packaged apps have no icon until the AppsFolder is read), so the
+	// cache is dropped when the snapshot changes.
+	if idx != a.indexSeen {
+		a.indexSeen = idx
+		a.icons.reset()
 	}
 
 	query := string(a.query)

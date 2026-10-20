@@ -231,7 +231,9 @@ func extractItemImage(folder comPtr, pidl unsafe.Pointer) (Icon, error) {
 		return Icon{}, err
 	}
 
-	return Icon{pixels: &iconPixels{size: iconSizePixels, bgra: pixels}}, nil
+	// Logos ship with uneven transparent padding; trim it so every icon has the
+	// same optical weight in a row.
+	return Icon{pixels: &iconPixels{size: iconSizePixels, bgra: trimToContent(pixels, iconSizePixels)}}, nil
 }
 
 type iconInfo struct {

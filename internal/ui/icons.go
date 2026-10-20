@@ -31,7 +31,12 @@ func (c *iconCache) get(path string) win.Icon {
 
 	icon, err := win.LoadShellIcon(path)
 	if err != nil {
-		icon = c.fallback
+		// Not cached: a packaged app's icon only exists once the scan has run,
+		// and pinning the placeholder here would freeze it for the life of the
+		// process. The lookup is a map hit until it succeeds, so retrying on the
+		// next paint costs nothing.
+		debugf("icon %q: %v", path, err)
+		return c.fallback
 	}
 
 	c.icons[path] = icon
@@ -45,6 +50,21 @@ func (c *iconCache) get(path string) win.Icon {
 		delete(c.icons, oldest)
 	}
 	return icon
+}
+
+// reset drops every cached icon, so the next paint asks the shell again. The
+// index scan swaps in icons that did not exist when the launcher first painted.
+func (c *iconCache) reset() {
+	if c == nil {
+		return
+	}
+	for path, icon := range c.icons {
+		if icon != c.fallback {
+			icon.Destroy()
+		}
+		delete(c.icons, path)
+	}
+	c.order = nil
 }
 
 func (c *iconCache) close() {

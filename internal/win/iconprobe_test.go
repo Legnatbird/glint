@@ -70,6 +70,14 @@ func TestProbePackagedIcon(t *testing.T) {
 			continue
 		}
 
+		var bm struct {
+			bmType, bmWidth, bmHeight, bmWidthBytes int32
+			bmPlanes, bmBitsPixel                   uint16
+			bmBits                                  uintptr
+		}
+		procGetObject.Call(uintptr(bitmap), unsafe.Sizeof(bm), uintptr(unsafe.Pointer(&bm)))
+		t.Logf("%-22s bitmap is %dx%d %dbpp", probe.name, bm.bmWidth, bm.bmHeight, bm.bmBitsPixel)
+
 		pixels, err := readBitmapPixels(bitmap, int32(probe.size))
 		procDeleteObject.Call(uintptr(bitmap))
 		if err != nil {
@@ -95,6 +103,8 @@ func TestProbePackagedIcon(t *testing.T) {
 			probe.name, path, r>>8, g>>8, b>>8, a>>8, cr>>8, cg>>8, cb>>8, ca>>8)
 	}
 }
+
+var procGetObject = gdi32.NewProc("GetObjectW")
 
 func bgraToImage(pixels []byte, size int32) image.Image {
 	img := image.NewNRGBA(image.Rect(0, 0, int(size), int(size)))
