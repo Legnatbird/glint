@@ -11,14 +11,16 @@ import (
 const settingsClassName = "AppLauncherSettings"
 
 const (
-	wmSize       = 0x0005
-	wmSysKeyDown = 0x0104
-	wmMouseMove  = 0x0200
-	wmMouseWheel = 0x020A
-	wmMouseLeave = 0x02A3
+	wmSize        = 0x0005
+	wmSysKeyDown  = 0x0104
+	wmMouseMove   = 0x0200
+	wmMouseDblClk = 0x0203
+	wmMouseWheel  = 0x020A
+	wmMouseLeave  = 0x02A3
 
-	csHDraw = 0x0002
-	csVDraw = 0x0001
+	csHDraw   = 0x0002
+	csVDraw   = 0x0001
+	csDblClks = 0x0008
 
 	tmeLeave = 0x00000002
 )
@@ -57,15 +59,16 @@ type SettingsWindow struct {
 	hwnd    uintptr
 	visible bool
 
-	onPaint func(*Canvas)
-	onKey   func(KeyEvent) bool
-	onChar  func(rune)
-	onClick func(x, y int32)
-	onWheel func(delta int32)
-	onMove  func(x, y int32)
-	onLeave func()
-	onBlur  func()
-	onClose func()
+	onPaint  func(*Canvas)
+	onKey    func(KeyEvent) bool
+	onChar   func(rune)
+	onClick  func(x, y int32)
+	onWheel  func(delta int32)
+	onMove   func(x, y int32)
+	onLeave  func()
+	onDblClk func(x, y int32)
+	onBlur   func()
+	onClose  func()
 
 	trackingLeave bool
 }
@@ -140,6 +143,12 @@ func settingsWndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 			}
 		}
 
+	case wmMouseDblClk:
+		if w != nil && w.onDblClk != nil {
+			w.onDblClk(loword(lParam), hiword(lParam))
+			return 0
+		}
+
 	case wmMouseLeave:
 		if w != nil {
 			w.trackingLeave = false
@@ -173,7 +182,9 @@ func NewSettingsWindow(title string, width, height int32) (*SettingsWindow, erro
 	// and Alt+Tab show the same mark as the tray and the settings row.
 	large, small := SelfIcon()
 	wc := wndClassEx{
-		style:         csHDraw | csVDraw,
+		// CS_DBLCLKS is what makes WM_LBUTTONDBLCLK arrive at all, and it lets
+		// Windows decide what a double click is instead of us timing clicks.
+		style:         csHDraw | csVDraw | csDblClks,
 		lpfnWndProc:   settingsProc,
 		hInstance:     windows.Handle(hinst),
 		hIcon:         windows.Handle(large),
@@ -260,6 +271,10 @@ func (w *SettingsWindow) OnMove(fn func(x, y int32)) { w.onMove = fn }
 
 // OnLeave installs the handler for the pointer leaving the client area.
 func (w *SettingsWindow) OnLeave(fn func()) { w.onLeave = fn }
+
+// OnDoubleClick installs the double-click handler, in client coordinates. It
+// runs in addition to the pair of button-up events that make the click.
+func (w *SettingsWindow) OnDoubleClick(fn func(x, y int32)) { w.onDblClk = fn }
 
 // OnBlur runs when the window loses the foreground.
 func (w *SettingsWindow) OnBlur(fn func()) { w.onBlur = fn }

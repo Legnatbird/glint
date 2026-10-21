@@ -102,6 +102,9 @@ const (
 	setStepX   = 250
 	setStepS   = 18
 	setStepGap = 4
+
+	// vkF2 starts editing the selected row's name, the way a file manager does.
+	vkF2 = 0x71
 )
 
 // NewSettings wires a form to a window. The window is not shown here: the
@@ -130,6 +133,7 @@ func NewSettings(window *win.SettingsWindow, cfg *core.Config, fonts *win.Fonts,
 	window.OnWheel(s.HandleWheel)
 	window.OnMove(s.HandleMouseMove)
 	window.OnLeave(s.HandleMouseLeave)
+	window.OnDoubleClick(s.HandleDoubleClick)
 	window.OnBlur(func() {
 		if s.capture {
 			s.capture = false
@@ -436,7 +440,7 @@ func (s *Settings) hint(rows []row) string {
 		switch rows[s.sel].kind {
 		case rowEntry:
 			if rows[s.sel].save != nil {
-				return "Enter renames · Delete removes · ↑↓ move"
+				return "Enter, F2 or double click renames · Delete removes"
 			}
 			return "Enter removes this entry · ↑↓ move"
 		case rowNumber, rowChoice:
@@ -512,6 +516,12 @@ func (s *Settings) HandleKey(k win.KeyEvent) bool {
 		s.step(rows, 1)
 	case win.KeyReturn, win.KeySpace:
 		s.activate(rows)
+	case vkF2:
+		// The key every file manager uses for the same thing. Enter already
+		// renames an editable row; F2 is here for the muscle memory.
+		if s.sel >= 0 && s.sel < len(rows) && rows[s.sel].save != nil {
+			s.beginEdit(rows[s.sel].label)
+		}
 	case win.KeyDelete:
 		if s.sel >= 0 && s.sel < len(rows) {
 			if kind := rows[s.sel].kind; kind == rowEntry || kind == rowDanger {
@@ -534,6 +544,12 @@ func (s *Settings) HandleKey(k win.KeyEvent) bool {
 // HandleClick selects the row under the cursor and runs its action. Removable
 // rows only get selected: deleting on a stray click is not worth the risk.
 func (s *Settings) HandleClick(x, y int32) {
+	// While a name is being typed, a click would either throw the typing away or
+	// run another row's action behind the editor. The edit ends on Enter or Esc.
+	if s.edit >= 0 {
+		return
+	}
+
 	rows, _ := s.build()
 	local := y - (s.scale(setContentTop) - s.scroll)
 	s.armed = -1
@@ -592,6 +608,26 @@ func (s *Settings) HandleMouseLeave() {
 		return
 	}
 	s.hover = -1
+	s.invalidate()
+}
+
+// HandleDoubleClick runs the row's primary action, the way a double click does
+// everywhere: on a manual app that is renaming it, and only there, because
+// double-clicking a destructive row must not start arming it.
+func (s *Settings) HandleDoubleClick(x, y int32) {
+	if s.edit >= 0 {
+		return
+	}
+	row := s.rowAtY(y)
+	if row < 0 {
+		return
+	}
+	rows, _ := s.build()
+	if rows[row].save == nil {
+		return
+	}
+	s.sel = row
+	s.beginEdit(rows[row].label)
 	s.invalidate()
 }
 
