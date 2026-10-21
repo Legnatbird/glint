@@ -48,7 +48,7 @@ type App struct {
 	width, height int32
 	dpi           int32
 
-	query    []rune
+	field    textField
 	results  []core.Result
 	selected int
 	visible  bool
@@ -147,7 +147,7 @@ func debugf(format string, args ...any) {
 func (a *App) Show() {
 	debugf("show")
 	a.visible = true
-	a.query = a.query[:0]
+	a.field.clear()
 	a.selected = 0
 	a.status = ""
 	// A highlight from the previous appearance would point at whatever is under
@@ -164,7 +164,7 @@ func (a *App) Show() {
 // ShowQuery presents the launcher with a pre-filled query. Used by -demo.
 func (a *App) ShowQuery(q string) {
 	a.Show()
-	a.query = []rune(q)
+	a.field.setText(q)
 	a.refresh()
 	a.window.Invalidate()
 }
@@ -279,7 +279,7 @@ func (a *App) refresh() {
 		a.icons.reset()
 	}
 
-	query := string(a.query)
+	query := a.field.String()
 	results := idx.Search(core.Query{
 		Text:    query,
 		Limit:   a.config.MaxResults,
@@ -341,20 +341,22 @@ func (a *App) onChar(r rune) {
 	}
 	switch {
 	case r == 8: // backspace
-		if len(a.query) > 0 {
-			a.query = a.query[:len(a.query)-1]
-			a.selected = 0
-			a.status = ""
-			a.refresh()
-			a.resetCaret()
-			a.window.Invalidate()
+		if a.field.backspace() {
+			a.afterEdit()
 		}
 		return
 	case r < 32 || r == 127:
 		return
 	}
 
-	a.query = append(a.query, r)
+	a.field.insertRune(r)
+	a.afterEdit()
+}
+
+// afterEdit is the shared tail of every change to the query: the list has to be
+// recomputed, the selection goes back to the top result, and the caret is shown
+// again so it is never invisible right after typing.
+func (a *App) afterEdit() {
 	a.selected = 0
 	a.status = ""
 	a.refresh()
@@ -362,15 +364,40 @@ func (a *App) onChar(r rune) {
 	a.window.Invalidate()
 }
 
+// adjust repaints after the caret or the selection moved. The results do not
+// change, so nothing is recomputed.
+func (a *App) adjust() {
+	a.resetCaret()
+	a.window.Invalidate()
+}
+
+// singleLine turns a pasted block into one line: a query field holds no
+// newlines, and silently keeping half a path would be worse than a space.
+func singleLine(r rune) rune {
+	switch r {
+	case '\r', '\n', '\t':
+		return ' '
+	}
+	return r
+}
+
 func (a *App) onKey(k win.KeyEvent) bool {
 	if !a.visible {
 		return false
 	}
 
+	// Select all first: it is the gesture the user reaches for before replacing
+	// or deleting a query, and it needs no clipboard.
+	if k.Ctrl && k.VK == 'A' {
+		a.field.selectAll()
+		a.window.Invalidate()
+		return true
+	}
+
 	switch k.VK {
 	case win.KeyEscape:
-		if len(a.query) > 0 {
-			a.query = a.query[:0]
+		if !a.field.Empty() {
+			a.field.clear()
 			a.selected = 0
 			a.refresh()
 			a.resetCaret()
@@ -378,6 +405,46 @@ func (a *App) onKey(k win.KeyEvent) bool {
 			return true
 		}
 		a.Hide()
+		return true
+
+	case win.KeyLeft:
+		if k.Ctrl {
+			a.field.wordLeft(k.Shift)
+		} else {
+			a.field.left(k.Shift)
+		}
+		a.adjust() // the results do not change with the caret
+		return true
+
+	case win.KeyRight:
+		if k.Ctrl {
+			a.field.wordRight(k.Shift)
+		} else {
+			a.field.right(k.Shift)
+		}
+		a.adjust()
+		return true
+
+	case win.KeyHome:
+		a.field.home(k.Shift)
+		a.adjust()
+		return true
+
+	case win.KeyEnd:
+		a.field.end(k.Shift)
+		a.adjust()
+		return true
+
+	case win.KeyDelete:
+		if k.Ctrl {
+			if a.field.deleteWordForward() {
+				a.afterEdit()
+			}
+			return true
+		}
+		if a.field.deleteForward() {
+			a.afterEdit()
+		}
 		return true
 
 	case win.KeyUp:

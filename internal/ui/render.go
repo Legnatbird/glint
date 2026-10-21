@@ -91,28 +91,52 @@ func (a *App) paintQuery(c *win.Canvas, l layout) {
 	caretBottom := l.inputTop + l.inputH - a.scale(4)
 	caretW := a.scale(2)
 	caretGap := a.scale(5)
+	left := l.pad
+	right := a.width - l.pad
+	room := right - left - caretW - caretGap
 
 	// The caret marks the start of an empty field, so the placeholder begins
 	// after it. Painting both at the same x put the block on top of the "S".
-	if len(a.query) == 0 {
+	if a.field.Empty() {
 		if a.caretOn {
-			c.Fill(win.Rect{Left: l.pad, Top: caretTop, Right: l.pad + caretW, Bottom: caretBottom}, colorAccent)
+			c.Fill(win.Rect{Left: left, Top: caretTop, Right: left + caretW, Bottom: caretBottom}, colorAccent)
 		}
 		c.TextIn("Search applications", win.Rect{
-			Left:   l.pad + caretW + caretGap,
+			Left:   left + caretW + caretGap,
 			Top:    y,
-			Right:  a.width - l.pad,
+			Right:  right,
 			Bottom: y + textH,
 		}, colorDim)
 		return
 	}
 
-	// The caret is always after the last rune, so a query wider than the field
-	// shows its tail instead of being cut at the end.
-	text := c.Tail(string(a.query), a.width-l.pad*2-caretW-caretGap)
-	c.Text(text, l.pad, y, colorText)
+	runes := a.field.text
+	caret := a.field.caret
+
+	// Drop runes from the front until the caret fits. Measuring from the caret
+	// backwards is what keeps the caret visible when the user arrows into a long
+	// query instead of only when they type at the end.
+	start := 0
+	for start < caret && c.Measure(string(runes[start:caret])) > room {
+		start++
+	}
+
+	// The selection goes behind the text it covers.
+	if a.field.hasSelection() {
+		selStart, selEnd := a.field.selectionStart(), a.field.selectionEnd()
+		if selStart < start {
+			selStart = start
+		}
+		if selEnd > selStart {
+			x0 := left + c.Measure(string(runes[start:selStart]))
+			x1 := left + c.Measure(string(runes[start:selEnd]))
+			c.Fill(win.Rect{Left: x0, Top: caretTop, Right: x1, Bottom: caretBottom}, colorSelection)
+		}
+	}
+
+	c.Text(string(runes[start:]), left, y, colorText)
 	if a.caretOn {
-		x := l.pad + c.Measure(text) + a.scale(1)
+		x := left + c.Measure(string(runes[start:caret]))
 		c.Fill(win.Rect{Left: x, Top: caretTop, Right: x + caretW, Bottom: caretBottom}, colorAccent)
 	}
 }
@@ -250,7 +274,7 @@ func (a *App) footerHint() string {
 	const close = "Esc close"
 
 	if len(a.results) == 0 {
-		if len(a.query) == 0 {
+		if a.field.Empty() {
 			return "Type to search  ·  " + close
 		}
 		return "Esc clears the search  ·  F5 rescans"

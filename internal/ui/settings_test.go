@@ -306,7 +306,7 @@ func TestSettingsRowIsInjectedFirst(t *testing.T) {
 		open:    func() {},
 	}
 
-	a.query = []rune("sett")
+	a.field.setText("sett")
 	a.refresh()
 	if len(a.results) == 0 || a.results[0].Entry.Key != settingsKey {
 		t.Fatalf("first row = %+v, want the settings row", a.results)
@@ -316,7 +316,7 @@ func TestSettingsRowIsInjectedFirst(t *testing.T) {
 	}
 
 	// A query that does not name it never gets the row.
-	a.query = []rune("chr")
+	a.field.setText("chr")
 	a.refresh()
 	for _, r := range a.results {
 		if r.Entry.Key == settingsKey {
