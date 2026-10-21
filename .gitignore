@@ -5,6 +5,13 @@
 *.test
 *.out
 
+# Local data. The launcher writes these next to the binary (bin/ is ignored), and
+# an older build could leave a copy in the root: they hold this machine's app
+# inventory and paths, so they never belong in the repository.
+/config.json
+/history.json
+/index-cache.json
+
 # Local tooling
 /.gocache/
 /.idea/

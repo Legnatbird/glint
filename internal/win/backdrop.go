@@ -9,7 +9,7 @@ import (
 //
 // Windows 11 can round a window through DWM, with antialiasing. Windows 10 has no
 // such attribute, so the window is clipped to a region and the arc is a staircase
-// of whole pixels — which is why the painted border follows the same arc instead
+// of whole pixels, which is why the painted border follows the same arc instead
 // of cutting across the corner.
 //
 // The window is opaque: a translucent backdrop was removed because the accent

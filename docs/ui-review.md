@@ -44,7 +44,7 @@ controls, so the review is a review of painting code, hit-testing and key handli
 
 | What | Why |
 |---|---|
-| Colour contrast | Dim text on the panel is 4.9:1, body text 15:1, accent 7:1 — above AA. Nothing to fix. |
+| Colour contrast | Dim text on the panel is 4.9:1, body text 15:1, accent 7:1, above AA. Nothing to fix. |
 | Destructive rows | Two-press confirmation with an armed colour and a footer hint already works. |
 | Scrollbar (settings) | Wheel and keyboard reach everything; a draggable thumb is not worth the code yet. |
 | Tray menu | Items match the app's verbs and the autostart item shows a check. |
@@ -59,5 +59,5 @@ controls, so the review is a review of painting code, hit-testing and key handli
   that would do nothing.
 - Hover is feedback, not selection: the keyboard selection stays where it is, the pointer
   only shows which row a click would hit.
-- Anything that happens off the message thread — a second process, a finished scan —
+- Anything that happens off the message thread, a second process, a finished scan,
   reaches the window as a posted message, never by touching UI state directly.

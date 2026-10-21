@@ -2,7 +2,7 @@ package ui
 
 // textField is one line of user text with a caret and a selection.
 //
-// It is pure state: no font, no window, no Win32. That is deliberate — the
+// It is pure state: no font, no window, no Win32. That is deliberate: the
 // editing rules are the part worth testing, and a launcher's search box has to
 // behave like every other text box the user types in, which means a caret that
 // moves, a selection that replaces what it covers, and Home/End.

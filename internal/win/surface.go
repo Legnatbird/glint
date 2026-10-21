@@ -15,8 +15,8 @@ import (
 // GDI scale them is what made the list look ragged: DrawIconEx resamples with the
 // device's raw stretch mode, so a circle arrives with hard, stepped edges, while
 // the shell's bitmaps went through two resamples (once to trim their padding and
-// once to fit the slot) and arrived soft. Neither is a geometry problem — the
-// shapes were always right — but both read as "badly rendered".
+// once to fit the slot) and arrived soft. Neither is a geometry problem (the
+// shapes were always right), but both read as "badly rendered".
 //
 // So the pixels stay in Go: each icon is decoded once at its native size, its
 // visible box is measured once, and drawing fits that box into the slot with a

@@ -1,4 +1,4 @@
-# Glint — product and engineering plan
+# Glint: product and engineering plan
 
 Status: **P3 complete** · Updated: 2026-10-20
 
@@ -7,14 +7,14 @@ the launcher slice of [Wox](https://github.com/Wox-launcher/Wox) rebuilt around
 one constraint: it must cost almost nothing while idle.
 
 Wox v2 ships a Go core, a Flutter UI and plugin/cloud/AI/telemetry subsystems, and
-declares ~150 MB resident. This project keeps the one verb people repeat all day —
-*hotkey → type → Enter* — and drops everything else.
+declares ~150 MB resident. This project keeps the one verb people repeat all day,
+*hotkey → type → Enter*, and drops everything else.
 
 ## Quick path
 
-1. `go run ./cmd/spike` — prints the measured baseline (P0 evidence, ~6 s).
-2. `go test ./...` — matching, ranking and config rules.
-3. `go build -trimpath -ldflags "-s -w" -o bin/glint.exe ./cmd/glint` — P2.
+1. `go run ./cmd/spike`, prints the measured baseline (P0 evidence, ~6 s).
+2. `go test ./...`, matching, ranking and config rules.
+3. `go build -trimpath -ldflags "-s -w" -o bin/glint.exe ./cmd/glint`, P2.
 
 ## Decisions
 
@@ -40,19 +40,19 @@ non-Windows platforms.
 | Metric | Budget | Measured |
 |---|---|---|
 | Idle working set, full launcher with 99 apps | ≤ 30 MB | **28.7 MB** hidden (settings window created on first use) · **30 MB** with the settings form on screen |
-| Idle working set, bare shell (P0 spike) | — | **7.7 MB** before first show · **10.8 MB** after two show/hide cycles |
+| Idle working set, bare shell (P0 spike) | - | **7.7 MB** before first show · **10.8 MB** after two show/hide cycles |
 | Private bytes (spike) | ≤ 30 MB | **12.6 MB** |
 | Boot: `main` → hotkey registered | ≤ 120 ms | **2.6 ms** |
 | `Show()` (ShowWindow + SetForegroundWindow) | ≤ 50 ms | **3.2 ms** cold · **< 0.1 ms** warm |
 | First `WM_PAINT` after show | ≤ 50 ms | **2.2 ms** |
 | Full scan of every source | ≤ 300 ms | **74 ms** for 96 apps (163 ms with a cold file cache) |
 | Search over 3 000 entries | ≤ 1 ms | **0.11 ms**, 2 KB allocated per query |
-| CPU, whole 6 s spike run incl. startup and 2 paints | — | **~16 ms total** (0.0 % steady state) |
+| CPU, whole 6 s spike run incl. startup and 2 paints | - | **~16 ms total** (0.0 % steady state) |
 | OS threads | ≤ 16 | **13** |
 | Kernel handles | ≤ 500 | **388** idle · **452** after the first icon extraction · **414** with the settings window |
 | GDI objects | ≤ 60 | **8** (before icons) |
-| Icon extraction (first time only) | — | **+2.4 MB private, +76 handles**, then flat |
-| Shell folder dialog, transient | — | **+12 MB working set, +150 handles** while a picker is open; the shell keeps them cached in-process afterwards |
+| Icon extraction (first time only) | - | **+2.4 MB private, +76 handles**, then flat |
+| Shell folder dialog, transient | - | **+12 MB working set, +150 handles** while a picker is open; the shell keeps them cached in-process afterwards |
 | Binary size | ≤ 15 MB | **3.47 MB** (46 KB of it is the embedded .ico) |
 | Processes | 1 | **1** |
 | Network connections | 0 | **0** |
@@ -61,7 +61,7 @@ Reproduce with `go run ./cmd/spike`. The report is JSON on stdout.
 
 **Headroom.** Of the 30 MB budget, ~19 MB remain for the app index, the icon cache
 and the result list. A 3 000-entry index at ~100 B per entry is ~300 KB; 64 cached
-HICONs are a few hundred KB. The budget is not tight — it is a guardrail against
+HICONs are a few hundred KB. The budget is not tight, it is a guardrail against
 the usual launcher bloat (frameworks, webviews, idle pollers).
 
 ## What "an app" means
@@ -101,11 +101,11 @@ Registry `App Paths` is re-read on every full rebuild, never per keystroke.
 
 ## Matching and ranking
 
-- **Normalization**: lowercase, strip diacritics, then build two forms — the
+- **Normalization**: lowercase, strip diacritics, then build two forms, the
   display form (for highlighting) and a compact form without spaces, dots and
   dashes (`visual studio code` and `vscode` must both hit).
 - **Match**: ordered subsequence with a score. Bonuses for consecutive characters,
-  word starts and prefix matches; penalty for gaps. No fuzzy-edit distance in v1 —
+  word starts and prefix matches; penalty for gaps. No fuzzy-edit distance in v1:
   it costs time per key and users rarely mistype the first two letters.
 - **Rank**: `score * 0.6 + frecency * 0.4`, where frecency is a decaying use count
   (7-day half-life, Laplace-smoothed so a single use does not dominate). Ties break
@@ -170,7 +170,7 @@ what keeps matching and ranking testable without a desktop session.
 | **P1** ✅ | `core`: matcher, ranker, config, cache format | 31 test functions green; 3 000 entries in **0.11 ms** |
 | **P2** ✅ | Sources + window + launch | 96 apps found (73 Start Menu, 11 Store, 15 App Paths, 12 PATH after the GUI filter); `.lnk` and UWP both launch; hotkey steals the foreground from another app |
 | **P3** ✅ | Frecency wired to the ranker, `history.json`, tray menu, autostart | Launched apps outrank text matches after a restart (`history.json` round-trips); tray adds, toggles autostart and quits; empty query shows only used apps |
-| **P4** ✅ | Polish: app icons ✅, rounded corners ✅, the launcher's own icon in the tray, the title bar and the executable ✅ | Single-monitor target: per-monitor DPI changes are out of scope and `WM_DPICHANGED` is not handled. Corners: DWM on Windows 11, a window region on Windows 10 — the region clip is binary, so the painted border follows the same arc instead of cutting the corner |
+| **P4** ✅ | Polish: app icons ✅, rounded corners ✅, the launcher's own icon in the tray, the title bar and the executable ✅ | Single-monitor target: per-monitor DPI changes are out of scope and `WM_DPICHANGED` is not handled. Corners: DWM on Windows 11, a window region on Windows 10, the region clip is binary, so the painted border follows the same arc instead of cutting the corner |
 | **P5** ✅ | Settings window: editable controls, live apply | Every control in the table below edits `config.json` and reaches the running launcher without a restart; the hotkey is released while a combination is recorded |
 
 ### App icons
@@ -186,7 +186,7 @@ Those logos carry an alpha channel, and GDI will not do the job: `DrawIconEx`
 decides transparency from a 1bpp AND mask and scales with the device's raw stretch
 mode, which is what left hard, stepped edges around every circle, while
 `AlphaBlend` rejects the shell's surfaces with `ERROR_INVALID_PARAMETER` on this
-build. So every icon — HICON or shell bitmap — is decoded once into straight-alpha
+build. So every icon, HICON or shell bitmap, is decoded once into straight-alpha
 BGRA at its own size, its visible box is measured once, and drawing fits that box
 to the row with a single resample: area averaging when it shrinks, interpolation
 when it grows. One `StretchDIBits` per icon, no GDI handle held per app, and the
@@ -197,7 +197,7 @@ nearest asset the package ships (a 32×32 canvas holding a 24×18 mark), file ic
 arrive with whatever padding their `.ico` author chose; fitting the *visible box*
 gives them the same optical weight in a row without ever changing their shape.
 
-## P5 — settings window
+## P5: settings window
 
 Built as decided: a **separate window** (own overlap window, title bar, resizable),
 not an overlay inside the launcher popup, and changes apply **live** while editing.

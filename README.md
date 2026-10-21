@@ -1,6 +1,6 @@
 # Glint
 
-A Windows-only, keyboard-first launcher for applications — the launcher slice
+A Windows-only, keyboard-first launcher for applications: the launcher slice
 of Wox, rebuilt to stay under 30 MB and answer every keystroke in about a
 millisecond.
 
@@ -8,14 +8,14 @@ Plan and living decisions: [docs/plan.md](docs/plan.md).
 
 ## Status
 
-- **P0** complete — hidden Win32 shell: 10.8 MB, 2.6 ms boot, 3.2 ms to visible.
-- **P1** complete — fuzzy matcher, frecency, portable config and index cache;
+- **P0** complete, hidden Win32 shell: 10.8 MB, 2.6 ms boot, 3.2 ms to visible.
+- **P1** complete, fuzzy matcher, frecency, portable config and index cache;
   3 000 apps ranked in 0.11 ms.
-- **P2** complete — 217 apps discovered (Start Menu, Store/UWP, App Paths, PATH),
+- **P2** complete, 217 apps discovered (Start Menu, Store/UWP, App Paths, PATH),
   drawn result list, global hotkey, `.lnk` and UWP launching.
-- **P3** complete — usage history in `history.json`, frecency drives the ranking, tray menu, autostart toggle.
-- **P4** complete — app icons (shell and Store apps), rounded corners, the launcher's own icon embedded in the executable.
-- **P5** complete — settings window: editable controls that apply live, no restart.
+- **P3** complete, usage history in `history.json`, frecency drives the ranking, tray menu, autostart toggle.
+- **P4** complete, app icons (shell and Store apps), rounded corners, the launcher's own icon embedded in the executable.
+- **P5** complete, settings window: editable controls that apply live, no restart.
 
 ## Requirements
 
@@ -54,12 +54,12 @@ machine:
 | `←` `→` `Home` `End` | Move the caret |
 | `Shift`+movement | Select |
 | `Ctrl+←` `Ctrl+→` | Move by word |
-| `Ctrl+A` | Select all — then type to replace, or `Backspace` to clear |
+| `Ctrl+A` | Select all, then type to replace, or `Backspace` to clear |
 | `Ctrl+Backspace` `Ctrl+Delete` | Delete a word |
 
 The pointer works too: hovering shows which row a click would hit, clicking
 launches it, and the wheel moves the selection three rows at a time. Hover is only
-feedback — it never moves the keyboard selection, so reaching for the mouse cannot
+feedback, it never moves the keyboard selection, so reaching for the mouse cannot
 change what `Enter` will do.
 
 Typing `set` (or `con`, `aju`, `pref`) puts a **Settings** row on top of the list;
@@ -76,7 +76,7 @@ One column of rows, keyboard first; the pointer hovers and clicks the same rows:
 | `↑` `↓` `Tab` | Move between rows |
 | `←` `→` | Change a value (`max_results`, PATH scope) |
 | `Enter` `Space` | Activate: record a hotkey, toggle, pick a folder, clear |
-| `Enter` on a manual app | Rename it — `Ctrl+A`, arrows and `Backspace` work while typing |
+| `Enter` on a manual app | Rename it, `Ctrl+A`, arrows and `Backspace` work while typing |
 | `F2` or double click on a manual app | The same rename, for the muscle memory |
 | `Enter`, a click outside, or leaving the window | Saves the name; `Esc` discards it |
 | `Delete` on a manual app or folder | Remove it (asks twice) |
@@ -164,9 +164,9 @@ docs/plan.md      product and engineering plan
 ## Icon
 
 The mark (a rounded accent panel with a white chevron and a band of light across
-its top — the glint) is drawn in code, once, in `internal/art`. The tray, the
+its top, which is the glint) is drawn in code, once, in `internal/art`. The tray, the
 settings row, the settings title bar and the executable's own icon all come from
-that one buffer — see [assets/README.md](assets/README.md) for how the `.ico` is
+that one buffer; see [assets/README.md](assets/README.md) for how the `.ico` is
 generated and embedded, and for the version block that makes Windows call the
 program Glint rather than `glint.exe`.
 
@@ -185,5 +185,5 @@ the font, or growing the font without the row, is what makes a list look cramped
 The visible box, not the canvas, is what gets fitted. Packaged logos arrive inside
 a 32×32 canvas that may hold a 24×18 mark, and file icons carry whatever padding
 their `.ico` author chose; fitting the box gives them the same optical weight
-without changing their shape. Artwork that is not square — Terminal and PowerShell
-ship 4:3 tiles — therefore stays 4:3, which is what its package contains.
+without changing their shape. Artwork that is not square (Terminal and PowerShell
+ship 4:3 tiles) therefore stays 4:3, which is what its package contains.

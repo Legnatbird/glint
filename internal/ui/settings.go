@@ -371,7 +371,7 @@ func (s *Settings) stepHit(x int32) (int, bool) {
 
 // paintEditor draws the row being renamed as an inset text field: a darker box
 // with a border, the selection behind the text and the caret in the accent
-// colour. It is small on purpose — the row keeps its place in the form.
+// colour. It is small on purpose: the row keeps its place in the form.
 func (s *Settings) paintEditor(c *win.Canvas, y, h, textY, left, right int32) {
 	top := y + s.scale(3)
 	bottom := y + h - s.scale(3)

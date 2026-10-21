@@ -12,7 +12,7 @@ internal/art/art.go ──┬── internal/win/appicon.go  → HICON for the t
 ```
 
 `internal/art` rasterizes a rounded accent panel with a white chevron, 4×4
-supersampled, with a band of light across its top — the glint the name is about.
+supersampled, with a band of light across its top, which is the glint the name is about.
 Every consumer reads that one buffer, so the tray, the settings row, the window
 title bar and Explorer cannot drift apart.
 
@@ -52,7 +52,7 @@ program's HICON.
 The version block is what makes the startup list say **Glint** instead of
 `glint.exe`: Windows shows `FileDescription` when it exists and falls back to the
 file name when it does not. `versioninfo.json` is therefore part of the identity,
-not decoration — changing `ProductName` there changes what the operating system
+not decoration, changing `ProductName` there changes what the operating system
 calls the program.
 
 The fields are not interchangeable, and Windows labels them in the user's language:
@@ -60,8 +60,8 @@ The fields are not interchangeable, and Windows labels them in the user's langua
 | Field | Spanish Explorer | Value |
 |---|---|---|
 | `ProductName` | Nombre del producto | Glint |
-| `FileDescription` | Descripción | Glint — what the startup list shows |
-| `CompanyName` | **Editor** | Legnatbird — the person, not the program |
+| `FileDescription` | Descripción | Glint (what the startup list shows) |
+| `CompanyName` | **Editor** | Legnatbird (the person, not the program) |
 | `LegalCopyright` | Copyright | © Legnatbird |
 | `OriginalFilename` | Nombre original | glint.exe |
 

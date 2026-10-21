@@ -194,8 +194,8 @@ func (a *App) indexEmpty() bool {
 //
 // The slot is the square the row reserves; the logo is drawn a little smaller
 // inside it. Windows keeps that margin around every app logo, and here it also
-// does optical work: a logo that is not square — Terminal and PowerShell ship
-// 4:3 tiles — gets scaled to the slot's width, so filling it edge to edge makes
+// does optical work: a logo that is not square (Terminal and PowerShell ship
+// 4:3 tiles) gets scaled to the slot's width, so filling it edge to edge makes
 // the tile read as stretched next to the square logos in the same list.
 const (
 	iconSlot = 32 // reserved square, in logical pixels
