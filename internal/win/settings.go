@@ -199,12 +199,26 @@ func NewSettingsWindow(title string, width, height int32) (*SettingsWindow, erro
 	}
 
 	titlePtr, _ := windows.UTF16PtrFromString(title)
+
+	// Centre it in the work area rather than letting it land top-left. A window
+	// that opens at a fixed corner reads as an accident, and the settings window
+	// is the one surface the user opens on purpose.
+	areaX, areaY, areaW, areaH := WorkArea()
+	posX := areaX + (areaW-width)/2
+	posY := areaY + (areaH-height)/2
+	if posX < areaX {
+		posX = areaX
+	}
+	if posY < areaY {
+		posY = areaY
+	}
+
 	hwnd, _, createErr := procCreateWindowExW.Call(
 		uintptr(wsExAppWindow),
 		uintptr(unsafe.Pointer(class)),
 		uintptr(unsafe.Pointer(titlePtr)),
 		uintptr(wsOverlappedWindow),
-		120, 120,
+		uintptr(uint32(posX)), uintptr(uint32(posY)),
 		uintptr(uint32(width)), uintptr(uint32(height)),
 		0, 0, hinst, 0,
 	)

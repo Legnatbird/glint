@@ -67,11 +67,32 @@ func PostToRunningInstance(msg uint32) bool {
 	}
 	ok, _, _ := procPostMessageW.Call(hwnd, uintptr(msg), 0, 0)
 	return ok != 0
-} // SystemDPI returns the primary monitor's DPI, used to size the window before
+}
+
+// SystemDPI returns the primary monitor's DPI, used to size the window before
 // it exists.
 func SystemDPI() uint32 {
 	if dpi, _, _ := procGetDpiForSystem.Call(); dpi != 0 {
 		return uint32(dpi)
 	}
 	return 96
+}
+
+// spiGetWorkArea is SPI_GETWORKAREA: the desktop minus the taskbar and any
+// appbar docked to an edge.
+const spiGetWorkArea = 0x0030
+
+// WorkArea returns the usable desktop rectangle. A window centred in it is
+// centred for the user; a window centred on the full screen sits under the
+// taskbar by half the taskbar's height.
+func WorkArea() (x, y, width, height int32) {
+	var r nativeRect
+	ok, _, _ := procSystemParameters.Call(
+		spiGetWorkArea, 0, uintptr(unsafe.Pointer(&r)), 0)
+	if ok == 0 || r.right <= r.left || r.bottom <= r.top {
+		screenW, _, _ := procGetSystemMetrics.Call(smCXScreen)
+		screenH, _, _ := procGetSystemMetrics.Call(smCYScreen)
+		return 0, 0, int32(screenW), int32(screenH)
+	}
+	return r.left, r.top, r.right - r.left, r.bottom - r.top
 }
