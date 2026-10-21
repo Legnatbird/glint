@@ -36,6 +36,7 @@ const (
 	KeyHome   = vkHome
 	KeyEnd    = vkEnd
 	KeyDelete = vkDelete
+	KeyBack   = vkBack
 	KeySpace  = 0x20
 	KeyF5     = 0x74
 )

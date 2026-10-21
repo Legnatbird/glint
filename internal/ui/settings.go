@@ -35,6 +35,10 @@ type Settings struct {
 	// hover is the row under the pointer, -1 when there is none. It shows what a
 	// click would hit without moving the keyboard selection.
 	hover int
+	// edit is the row whose label is being typed over, -1 when none. While it is
+	// set the keyboard belongs to field.
+	edit  int
+	field textField
 
 	status string
 	failed bool
@@ -76,6 +80,9 @@ type row struct {
 	h     int32
 	step  func(delta int)
 	act   func()
+	// save is set on rows whose label can be typed over, which is how a manual
+	// app's name stops being whatever its file was called.
+	save func(text string)
 }
 
 // Layout, in points at 96 dpi; everything is scaled by the window DPI.
@@ -88,6 +95,13 @@ const (
 	setValueX     = 190
 	setFooterH    = 32
 	setGap        = 8
+
+	// The stepper buttons that change a value. They sit at a fixed x so they do
+	// not wander as the value's width changes, and they are the part of a value
+	// row the pointer can act on.
+	setStepX   = 250
+	setStepS   = 18
+	setStepGap = 4
 )
 
 // NewSettings wires a form to a window. The window is not shown here: the
@@ -102,6 +116,7 @@ func NewSettings(window *win.SettingsWindow, cfg *core.Config, fonts *win.Fonts,
 		dpi:    96,
 		armed:  -1,
 		hover:  -1,
+		edit:   -1,
 	}
 	if window == nil {
 		return s
@@ -110,6 +125,7 @@ func NewSettings(window *win.SettingsWindow, cfg *core.Config, fonts *win.Fonts,
 	s.dpi = int32(window.DPI())
 	window.OnPaint(s.Paint)
 	window.OnKey(s.HandleKey)
+	window.OnChar(s.HandleChar)
 	window.OnClick(s.HandleClick)
 	window.OnWheel(s.HandleWheel)
 	window.OnMove(s.HandleMouseMove)
@@ -155,6 +171,10 @@ func (s *Settings) build() ([]row, int32) {
 		rows = append(rows, row{kind: kind, label: label, value: value, y: y, h: s.scale(setRowH), step: step, act: act})
 		y += s.scale(setRowH)
 	}
+	addEditable := func(kind rowKind, label, value string, save func(string)) {
+		rows = append(rows, row{kind: kind, label: label, value: value, y: y, h: s.scale(setRowH), save: save})
+		y += s.scale(setRowH)
+	}
 
 	header("General")
 	hotkey := s.cfg.Hotkey
@@ -180,7 +200,7 @@ func (s *Settings) build() ([]row, int32) {
 	header("Manual apps")
 	add(rowAction, "Add application…", "", nil, s.addManualApp)
 	for i, app := range s.cfg.ManualApps {
-		add(rowEntry, app.Name, app.Target, nil, s.dropManualApp(i))
+		addEditable(rowEntry, app.Name, app.Target, s.renameManualApp(i))
 	}
 	if len(s.cfg.ManualApps) == 0 {
 		add(rowHeader, "Nothing added by hand yet", "", nil, nil)
@@ -244,12 +264,17 @@ func (s *Settings) Paint(c *win.Canvas) {
 		c.UseFont(s.fonts.Row)
 		textY := y + (r.h-c.LineHeight())/2
 		valueX := pad + s.scale(setValueX)
-		c.TextIn(r.label, win.Rect{
-			Left:   pad,
-			Top:    textY,
-			Right:  valueX - s.scale(8),
-			Bottom: y + r.h,
-		}, colorText)
+		labelRight := valueX - s.scale(8)
+		if i == s.edit {
+			s.paintEditor(c, y, r.h, textY, pad, labelRight)
+		} else {
+			c.TextIn(r.label, win.Rect{
+				Left:   pad,
+				Top:    textY,
+				Right:  labelRight,
+				Bottom: y + r.h,
+			}, colorText)
+		}
 
 		if r.value != "" {
 			color := colorText
@@ -266,18 +291,95 @@ func (s *Settings) Paint(c *win.Canvas) {
 			}
 			// A manual app's target is usually longer than the window; ending it
 			// in an ellipsis is the difference between "shortened" and "broken".
+			right := width - pad
+			if r.kind == rowNumber || r.kind == rowChoice {
+				// Leave the stepper buttons their room instead of running the
+				// value under them.
+				right = s.scale(setStepX) - s.scale(8)
+			}
 			c.TextIn(r.value, win.Rect{
 				Left:   valueX,
 				Top:    textY,
-				Right:  width - pad,
+				Right:  right,
 				Bottom: y + r.h,
 			}, color)
+
+			if r.kind == rowNumber || r.kind == rowChoice {
+				s.paintStepper(c, y, r.h)
+			}
 		}
 	}
 	restore()
 
 	s.paintScrollbar(c, width, height, contentH, footerY)
 	s.paintFooter(c, width, footerY, rows)
+}
+
+// paintStepper draws the two buttons that change a value. Until they existed the
+// only way to change one was ←/→, which nothing on screen announced.
+//
+// The glyphs are drawn as rectangles instead of text: at 18px a "-" from a 12px
+// font is one faint pixel, while a two-pixel bar reads as a button.
+func (s *Settings) paintStepper(c *win.Canvas, y, h int32) {
+	size := s.scale(setStepS)
+	top := y + (h-size)/2
+	arm := size / 3
+	thick := s.scale(2)
+
+	for i := 0; i < 2; i++ {
+		x := s.scale(setStepX) + int32(i)*(size+s.scale(setStepGap))
+		c.Fill(win.Rect{Left: x, Top: top, Right: x + size, Bottom: top + size}, colorBorder)
+
+		cx, cy := x+size/2-arm/2, top+size/2-thick/2
+		c.Fill(win.Rect{Left: cx, Top: cy, Right: cx + arm, Bottom: cy + thick}, colorText)
+		if i == 1 { // the plus gets its vertical stroke
+			vx, vy := x+size/2-thick/2, top+size/2-arm/2
+			c.Fill(win.Rect{Left: vx, Top: vy, Right: vx + thick, Bottom: vy + arm}, colorText)
+		}
+	}
+}
+
+// stepHit maps a click at x to a stepper direction, so a click only changes a
+// value when it lands on a button.
+func (s *Settings) stepHit(x int32) (int, bool) {
+	size := s.scale(setStepS)
+	first := s.scale(setStepX)
+	second := first + size + s.scale(setStepGap)
+	switch {
+	case x >= first && x < first+size:
+		return -1, true
+	case x >= second && x < second+size:
+		return 1, true
+	}
+	return 0, false
+}
+
+// paintEditor draws the row being renamed as an inset text field: a darker box
+// with a border, the selection behind the text and the caret in the accent
+// colour. It is small on purpose — the row keeps its place in the form.
+func (s *Settings) paintEditor(c *win.Canvas, y, h, textY, left, right int32) {
+	top := y + s.scale(3)
+	bottom := y + h - s.scale(3)
+	c.Fill(win.Rect{Left: left - s.scale(4), Top: top, Right: right, Bottom: bottom}, ColorBackground)
+	c.RoundBorder(win.Rect{Left: left - s.scale(4), Top: top, Right: right, Bottom: bottom}, s.scale(3), colorBorder)
+
+	x := left
+	runes := s.field.text
+	if s.field.hasSelection() {
+		selStart, selEnd := s.field.selectionStart(), s.field.selectionEnd()
+		x0 := x + c.Measure(string(runes[:selStart]))
+		x1 := x + c.Measure(string(runes[:selEnd]))
+		c.Fill(win.Rect{Left: x0, Top: top + s.scale(2), Right: x1, Bottom: bottom - s.scale(2)}, colorSelection)
+	}
+	c.Text(string(runes), x, textY, colorText)
+
+	cx := x + c.Measure(string(runes[:s.field.caret]))
+	c.Fill(win.Rect{
+		Left:   cx,
+		Top:    top + s.scale(2),
+		Right:  cx + s.scale(2),
+		Bottom: bottom - s.scale(2),
+	}, colorAccent)
 }
 
 func (s *Settings) paintScrollbar(c *win.Canvas, width, height, contentH, footerY int32) {
@@ -321,15 +423,24 @@ func (s *Settings) hint(rows []row) string {
 	if s.capture {
 		return "Press the new combination · Esc to cancel"
 	}
+	if s.edit >= 0 {
+		return "Enter saves the name · Esc cancels"
+	}
 	if s.armed >= 0 && s.armed < len(rows) {
+		if rows[s.armed].save != nil {
+			return "Press Delete again to remove · Esc to cancel"
+		}
 		return "Press Enter again to remove · Esc to cancel"
 	}
 	if s.sel >= 0 && s.sel < len(rows) {
 		switch rows[s.sel].kind {
 		case rowEntry:
+			if rows[s.sel].save != nil {
+				return "Enter renames · Delete removes · ↑↓ move"
+			}
 			return "Enter removes this entry · ↑↓ move"
 		case rowNumber, rowChoice:
-			return "←→ change · ↑↓ move · Esc close"
+			return "←→ or the buttons change it · ↑↓ move"
 		case rowHotkey:
 			return "Enter records a new combination · Esc close"
 		}
@@ -361,6 +472,14 @@ func (s *Settings) commit() bool {
 func (s *Settings) HandleKey(k win.KeyEvent) bool {
 	if s.capture {
 		s.captureKey(k)
+		s.invalidate()
+		return true
+	}
+
+	// While a label is being typed over, the keyboard belongs to it: the form
+	// must not move its selection on the same arrow keys.
+	if s.edit >= 0 {
+		s.editKey(k)
 		s.invalidate()
 		return true
 	}
@@ -426,10 +545,10 @@ func (s *Settings) HandleClick(x, y int32) {
 		s.sel = i
 		switch r.kind {
 		case rowNumber, rowChoice:
-			if x > s.scale(setPad+setValueX) {
-				s.step(rows, 1)
-			} else {
-				s.step(rows, -1)
+			// Only the buttons change a value: a click elsewhere on the row just
+			// selects it, which is what a form row does everywhere else.
+			if delta, ok := s.stepHit(x); ok {
+				s.step(rows, delta)
 			}
 		case rowEntry, rowDanger:
 			// selected only
@@ -594,6 +713,14 @@ func (s *Settings) activate(rows []row) {
 	}
 	r := rows[s.sel]
 
+	// A row whose label can be typed over starts editing: Enter on a manual app
+	// renames it, and removal moved to Delete so the two gestures stop competing
+	// for the same key.
+	if r.save != nil {
+		s.beginEdit(r.label)
+		return
+	}
+
 	// Destructive rows take two presses: the first one arms, the second one
 	// runs. Anything else would let a stray Enter delete a folder.
 	if r.kind == rowEntry || r.kind == rowDanger {
@@ -614,6 +741,99 @@ func (s *Settings) activate(rows []row) {
 	if r.act != nil {
 		r.act()
 	}
+}
+
+// beginEdit starts typing over a row's label.
+func (s *Settings) beginEdit(label string) {
+	s.edit = s.sel
+	s.armed = -1
+	s.field.setText(label)
+	s.field.selectAll()
+	s.setStatus("", false)
+}
+
+// finishEdit writes the typed name back. An empty name is refused: a row with no
+// text is a row the user cannot find again.
+func (s *Settings) finishEdit(save bool) {
+	row, text := s.edit, strings.TrimSpace(s.field.String())
+	s.edit = -1
+	s.field.clear()
+	if !save || row < 0 {
+		return
+	}
+	rows, _ := s.build()
+	if row >= len(rows) || rows[row].save == nil {
+		return
+	}
+	if text == "" {
+		s.setError("The name cannot be empty")
+		return
+	}
+	if text == rows[row].label {
+		return
+	}
+	rows[row].save(text)
+}
+
+// editKey is the keyboard while a label is being typed over. It mirrors a text
+// box: the same movement keys, the same select-all, and the same delete keys.
+func (s *Settings) editKey(k win.KeyEvent) {
+	if k.Ctrl && k.VK == 'A' {
+		s.field.selectAll()
+		return
+	}
+	switch k.VK {
+	case win.KeyReturn:
+		s.finishEdit(true)
+	case win.KeyEscape:
+		s.finishEdit(false)
+	case win.KeyLeft:
+		if k.Ctrl {
+			s.field.wordLeft(k.Shift)
+		} else {
+			s.field.left(k.Shift)
+		}
+	case win.KeyRight:
+		if k.Ctrl {
+			s.field.wordRight(k.Shift)
+		} else {
+			s.field.right(k.Shift)
+		}
+	case win.KeyHome:
+		s.field.home(k.Shift)
+	case win.KeyEnd:
+		s.field.end(k.Shift)
+	case win.KeyDelete:
+		if k.Ctrl {
+			s.field.deleteWordForward()
+		} else {
+			s.field.deleteForward()
+		}
+	case win.KeyBack:
+		if k.Ctrl {
+			s.field.backspaceWord()
+		} else {
+			s.field.backspace()
+		}
+	}
+}
+
+// HandleChar feeds typed characters to the label being edited. Outside an edit
+// the form has no text of its own, so everything is ignored.
+func (s *Settings) HandleChar(r rune) {
+	if s.edit < 0 {
+		return
+	}
+	if r == 8 { // some layouts send backspace as a character
+		s.field.backspace()
+		s.invalidate()
+		return
+	}
+	if r < 32 || r == 127 {
+		return
+	}
+	s.field.insertRune(r)
+	s.invalidate()
 }
 
 // beginCapture releases the global hotkey and waits for a combination. Without
@@ -745,6 +965,21 @@ func (s *Settings) addExcludedFolder() {
 		s.setStatus("Skipping "+path, false)
 	}
 	s.rescan()
+}
+
+// renameManualApp returns the save hook for one manual app's name. The index is
+// rebuilt because the name is what the list shows and searches.
+func (s *Settings) renameManualApp(index int) func(string) {
+	return func(name string) {
+		if index < 0 || index >= len(s.cfg.ManualApps) {
+			return
+		}
+		s.cfg.ManualApps[index].Name = name
+		if s.commit() {
+			s.setStatus("Renamed to "+name, false)
+		}
+		s.rescan()
+	}
 }
 
 func (s *Settings) dropCustomFolder(folder string) func() {
