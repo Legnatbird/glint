@@ -150,9 +150,9 @@ go run ./cmd/spike
 ## Layout
 
 ```
-cmd/glint      the app: window, hotkey, wiring; rsrc.syso carries the icon
+cmd/glint         the app: window, hotkey, wiring; resource.syso carries the icon and the version block
 cmd/spike         P0 measurement harness
-internal/art      the launcher's mark, rasterized in pure Go
+internal/art      Glint's mark, rasterized in pure Go
 internal/win      the only package allowed to call Win32 (COM, GDI, shell)
 internal/sources  Start Menu, Store/UWP, App Paths and PATH scanners
 internal/core     matching, ranking, config, cache (no Win32)
@@ -163,10 +163,12 @@ docs/plan.md      product and engineering plan
 
 ## Icon
 
-The mark (a rounded accent panel with a white chevron) is drawn in code, once, in
-`internal/art`. The tray, the settings row, the settings title bar and the
-executable's own icon all come from that one buffer — see
-[assets/README.md](assets/README.md) for how the `.ico` is generated and embedded.
+The mark (a rounded accent panel with a white chevron and a band of light across
+its top — the glint) is drawn in code, once, in `internal/art`. The tray, the
+settings row, the settings title bar and the executable's own icon all come from
+that one buffer — see [assets/README.md](assets/README.md) for how the `.ico` is
+generated and embedded, and for the version block that makes Windows call the
+program Glint rather than `glint.exe`.
 
 Row icons come from the shell (`SHGetFileInfoW` for files, `IShellItemImageFactory`
 for packaged apps). Both kinds are decoded once into BGRA at their own size and

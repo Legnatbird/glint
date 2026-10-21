@@ -15,6 +15,10 @@ const (
 	// behind would start a second copy at login, pointing at a binary that no
 	// longer exists.
 	legacyRunValueName = "app-launcher"
+	// startupApprovedKey is where Explorer keeps the enabled/disabled state that
+	// the Task Manager startup list edits. It is keyed by value name, so the old
+	// name survives there even after the Run value is gone.
+	startupApprovedKey = `Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run`
 )
 
 // SetAutostart adds or removes the launcher from the per-user Run key.
@@ -33,6 +37,7 @@ func SetAutostart(enabled bool) error {
 	if err := key.DeleteValue(legacyRunValueName); err != nil && !errors.Is(err, registry.ErrNotExist) {
 		return err
 	}
+	dropLegacyStartupApproval()
 
 	if !enabled {
 		err := key.DeleteValue(runValueName)
@@ -47,6 +52,18 @@ func SetAutostart(enabled bool) error {
 		return err
 	}
 	return key.SetStringValue(runValueName, quotePath(exe))
+}
+
+// dropLegacyStartupApproval removes the state Explorer kept for the pre-rename
+// entry. Nothing starts because of it, but it keeps showing the old name in the
+// startup list, next to the new one.
+func dropLegacyStartupApproval() {
+	key, err := registry.OpenKey(registry.CURRENT_USER, startupApprovedKey, registry.SET_VALUE)
+	if err != nil {
+		return
+	}
+	defer key.Close()
+	_ = key.DeleteValue(legacyRunValueName)
 }
 
 // AutostartEnabled reports whether the Run key currently has a value.

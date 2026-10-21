@@ -12,6 +12,20 @@ const (
 	AccentB = 255
 )
 
+// The gloss is the light the name is about: a band of it across the top of the
+// rounded panel, wider on the left, the way light falling from the upper-left
+// looks on a raised surface.
+//
+// A band with a soft edge, not a gradient over the whole panel: a gradient reads
+// as a vignette and vanishes at icon sizes, while an edge survives being drawn at
+// 16px. It is also the same shape at every size, so nothing is redrawn per scale.
+const (
+	glossPeak    = 0.32 // how much white the lit band mixes in, 0..1
+	glossEdge    = 0.30 // where the band ends at the left edge, in unit coordinates
+	glossSlope   = 0.10 // how much that boundary drops towards the right edge
+	glossFeather = 0.06 // width of the soft edge, so it is not a cut-out
+)
+
 // supersampling is the coverage grid per pixel. 4x4 is enough for the sizes the
 // shell asks for and keeps the whole render under a millisecond.
 const supersampling = 4
@@ -57,12 +71,19 @@ func RenderBGRA(size int32) []byte {
 				continue
 			}
 
-			// Blend the white glyph over the accent panel, then scale alpha by
-			// the panel coverage so the corners stay smooth.
+			// The panel is lit first and the glyph sits on top of it, which is
+			// what a raised white shape over a shining surface looks like.
+			shine := gloss((float64(x)+0.5)/float64(size), (float64(y)+0.5)/float64(size))
+			panelR := AccentR + (255-AccentR)*shine
+			panelG := AccentG + (255-AccentG)*shine
+			panelB := AccentB + (255-AccentB)*shine
+
+			// Blend the white glyph over the lit panel, then scale alpha by the
+			// panel coverage so the corners stay smooth.
 			mix := float64(inGlyph) / float64(inPanel)
-			r := AccentR + (255-AccentR)*mix
-			g := AccentG + (255-AccentG)*mix
-			b := AccentB + (255-AccentB)*mix
+			r := panelR + (255-panelR)*mix
+			g := panelG + (255-panelG)*mix
+			b := panelB + (255-panelB)*mix
 			a := 255.0 * float64(inPanel) / steps
 
 			offset := (y*size + x) * 4
@@ -73,6 +94,19 @@ func RenderBGRA(size int32) []byte {
 		}
 	}
 	return buf
+}
+
+// gloss is the strength of the highlight at unit coordinates (u, v).
+func gloss(u, v float64) float64 {
+	edge := glossEdge - glossSlope*u
+	if v >= edge {
+		return 0
+	}
+	if v <= edge-glossFeather {
+		return glossPeak
+	}
+	t := (edge - v) / glossFeather
+	return glossPeak * t * t * (3 - 2*t)
 }
 
 // InsideRoundedRect reports whether (x, y) falls inside the axis-aligned square

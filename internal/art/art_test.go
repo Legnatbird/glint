@@ -71,3 +71,60 @@ func TestPointInPolygon(t *testing.T) {
 		t.Error("outside point reported inside")
 	}
 }
+
+// The mark is named after a glint, so the light has to be a band at the top of
+// the panel, wider on the left, with a soft edge.
+func TestGlossIsABandAtTheTop(t *testing.T) {
+	if got := gloss(0.1, 0.1); got != glossPeak {
+		t.Fatalf("top gloss = %v, want the full %v", got, glossPeak)
+	}
+	if got := gloss(0.1, 0.5); got != 0 {
+		t.Fatalf("middle gloss = %v, want none", got)
+	}
+	// Light from the upper-left: the same height is lit on the left, not on the right.
+	if gloss(0.1, 0.24) <= gloss(0.9, 0.24) {
+		t.Fatalf("band does not slope: left %v, right %v", gloss(0.1, 0.24), gloss(0.9, 0.24))
+	}
+	// The edge is soft, not a cut-out.
+	if mid := gloss(0.1, 0.26); mid <= 0 || mid >= glossPeak {
+		t.Fatalf("edge gloss = %v, want something between 0 and %v", mid, glossPeak)
+	}
+}
+
+// Rendered pixels, not the helper: the panel's top-left has to come out lighter
+// than its bottom-right.
+func TestRenderIsLitFromTheTopLeft(t *testing.T) {
+	const size = 64
+	buf := RenderBGRA(size)
+
+	lum := func(x, y int32) int {
+		o := (y*size + x) * 4
+		if buf[o+3] == 0 {
+			t.Fatalf("(%d,%d) is transparent, cannot compare", x, y)
+		}
+		return int(buf[o]) + int(buf[o+1]) + int(buf[o+2])
+	}
+
+	// Both points sit in the panel margin, away from the white glyph.
+	topLeft := lum(size/8, size/8)
+	bottomRight := lum(size-size/8-1, size-size/8-1)
+	if topLeft <= bottomRight {
+		t.Fatalf("top-left luminance %d is not brighter than bottom-right %d", topLeft, bottomRight)
+	}
+}
+
+// The glyph has to stay white: a shine that reached it would wash out the only
+// shape this mark has at 16px.
+func TestGlyphStaysWhite(t *testing.T) {
+	// A variable, not a constant: int32(0.58*64) would be a constant conversion
+	// and Go refuses a non-integer constant.
+	size := int32(64)
+	buf := RenderBGRA(size)
+
+	// The chevron's tip, from the polygon in this package.
+	x, y := int32(0.58*float64(size)), int32(0.50*float64(size))
+	o := (y*size + x) * 4
+	if buf[o] < 250 || buf[o+1] < 250 || buf[o+2] < 250 {
+		t.Fatalf("glyph tip = %d,%d,%d, want white", buf[o], buf[o+1], buf[o+2])
+	}
+}
