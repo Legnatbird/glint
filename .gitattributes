@@ -1,0 +1,10 @@
+# Line endings are LF everywhere, in the repository and in every working tree.
+#
+# Not a style preference: gofmt reports a file with CRLF line endings as needing
+# formatting, so on a Windows runner with the default core.autocrlf=true the CI
+# format check fails on every file even though the committed bytes are canonical.
+* text=auto eol=lf
+
+# Written by tools, never by hand, and never text.
+*.ico binary
+*.syso binary
