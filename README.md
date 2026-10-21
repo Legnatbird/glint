@@ -77,6 +77,7 @@ One column of rows, keyboard first; the pointer hovers and clicks the same rows:
 | `←` `→` | Change a value (`max_results`, PATH scope) |
 | `Enter` `Space` | Activate: record a hotkey, toggle, pick a folder, clear |
 | `Enter` on a manual app | Rename it — `Ctrl+A`, arrows and `Backspace` work while typing |
+| `F2` or double click on a manual app | The same rename, for the muscle memory |
 | `Delete` on a manual app or folder | Remove it (asks twice) |
 | `Esc` | Close |
 
