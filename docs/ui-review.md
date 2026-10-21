@@ -20,7 +20,7 @@ controls, so the review is a review of painting code, hit-testing and key handli
 | # | What | Evidence | Status |
 |---|---|---|---|
 | 1 | Settings rows paint their text at a fixed `y+7` while a row is 30px tall, so every label and value sits low in its row; the 44px→50px row change made it worse (the font went 16px→18px). | `state-6-settings`, `state-9-armed` | fixed |
-| 2 | Long text is clipped mid-glyph instead of ending in an ellipsis: a manual app's path runs off the settings window, and a long app name runs off the launcher. | `state-7-capture` (`…\GF2Exilium\PCLauncher.exe` cut at the edge) | fixed |
+| 2 | Long text is clipped mid-glyph instead of ending in an ellipsis: a manual app's path runs off the settings window, and a long app name runs off the launcher. | a long manual app target, cut at the window edge | fixed |
 | 3 | With an empty query the caret is painted at the same x as the placeholder, so the block sits on top of the "S" of "Search applications". | `paintQuery` draws both at `l.pad` | fixed |
 | 4 | The launcher footer always lists "Enter · Shift+Enter · Ctrl+Enter · Esc", including when there are no results or the selection is the Settings row, where three of the four do nothing. | `state-3-noresults`, `state-4-settings-row` | fixed |
 | 5 | "No applications found" says what happened but not what to do, and it reads the same while the first scan is still running. | `state-3-noresults` | fixed |

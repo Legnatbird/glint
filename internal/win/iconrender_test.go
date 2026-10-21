@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"unsafe"
 
@@ -264,16 +265,26 @@ func sanitize(name string) string {
 	return string(out)
 }
 
-// extraIconPaths is a few desktop executables, which take the HICON path.
+// extraIconPaths is a few desktop executables, which take the HICON path: three
+// that ship with Windows, plus whatever the caller names in RENDER_EXTRA
+// (semicolon separated) so a machine-specific app can be checked without putting
+// that machine's paths in the repository.
 func extraIconPaths() []string {
-	var out []string
-	for _, p := range []string{
+	paths := []string{
 		`C:\Windows\System32\notepad.exe`,
 		`C:\Windows\System32\mspaint.exe`,
 		`C:\Windows\System32\cmd.exe`,
-		`D:\ArcTracker\ARCTracker.exe`,
-		`d:\steam\steamapps\common\Arc Raiders\PioneerGame.exe`,
-	} {
+	}
+	if extra := os.Getenv("RENDER_EXTRA"); extra != "" {
+		paths = append(paths, strings.Split(extra, ";")...)
+	}
+
+	var out []string
+	for _, p := range paths {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
 		if _, err := os.Stat(p); err == nil {
 			out = append(out, p)
 		}
