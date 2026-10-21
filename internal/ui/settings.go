@@ -32,6 +32,9 @@ type Settings struct {
 	scroll  int32
 	capture bool
 	armed   int // row armed for a destructive action, -1 when none
+	// hover is the row under the pointer, -1 when there is none. It shows what a
+	// click would hit without moving the keyboard selection.
+	hover int
 
 	status string
 	failed bool
@@ -98,6 +101,7 @@ func NewSettings(window *win.SettingsWindow, cfg *core.Config, fonts *win.Fonts,
 		hooks:  hooks,
 		dpi:    96,
 		armed:  -1,
+		hover:  -1,
 	}
 	if window == nil {
 		return s
@@ -108,6 +112,8 @@ func NewSettings(window *win.SettingsWindow, cfg *core.Config, fonts *win.Fonts,
 	window.OnKey(s.HandleKey)
 	window.OnClick(s.HandleClick)
 	window.OnWheel(s.HandleWheel)
+	window.OnMove(s.HandleMouseMove)
+	window.OnLeave(s.HandleMouseLeave)
 	window.OnBlur(func() {
 		if s.capture {
 			s.capture = false
@@ -228,6 +234,8 @@ func (s *Settings) Paint(c *win.Canvas) {
 		if i == s.sel {
 			c.Fill(win.Rect{Left: 0, Top: y, Right: width, Bottom: y + r.h}, colorSelection)
 			c.Fill(win.Rect{Left: 0, Top: y, Right: s.scale(3), Bottom: y + r.h}, colorAccent)
+		} else if i == s.hover {
+			c.Fill(win.Rect{Left: 0, Top: y, Right: width, Bottom: y + r.h}, colorHover)
 		}
 
 		// Text is centred on the font's own line height rather than on a
@@ -430,6 +438,41 @@ func (s *Settings) HandleClick(x, y int32) {
 		}
 		break
 	}
+	s.invalidate()
+}
+
+// rowAtY returns the index of the row under client y, or -1 when there is none.
+func (s *Settings) rowAtY(y int32) int {
+	rows, _ := s.build()
+	local := y - (s.scale(setContentTop) - s.scroll)
+	for i, r := range rows {
+		if r.kind == rowHeader {
+			continue
+		}
+		if local >= r.y && local < r.y+r.h {
+			return i
+		}
+	}
+	return -1
+}
+
+// HandleMouseMove highlights the row under the pointer. Hover is feedback: the
+// keyboard selection stays where it is and only a click moves it.
+func (s *Settings) HandleMouseMove(x, y int32) {
+	row := s.rowAtY(y)
+	if row == s.hover {
+		return
+	}
+	s.hover = row
+	s.invalidate()
+}
+
+// HandleMouseLeave drops the highlight when the pointer leaves the window.
+func (s *Settings) HandleMouseLeave() {
+	if s.hover == -1 {
+		return
+	}
+	s.hover = -1
 	s.invalidate()
 }
 

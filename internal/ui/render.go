@@ -9,6 +9,7 @@ import (
 const (
 	ColorBackground uint32 = 0x1F1A1A // #1A1A1F
 	colorSelection  uint32 = 0x332A2A // #2A2A33
+	colorHover      uint32 = 0x2A2323 // #23232A
 	colorSeparator  uint32 = 0x382F2F // #2F2F38
 	colorText       uint32 = 0xF1ECEC // #ECECF1
 	colorDim        uint32 = 0x968A8A // #8A8A96
@@ -119,25 +120,27 @@ func (a *App) paintQuery(c *win.Canvas, l layout) {
 func (a *App) paintResults(c *win.Canvas, l layout) {
 	c.UseFont(a.fonts.Row)
 
-	// Keep the selection visible if there are more results than rows.
-	offset := int32(0)
-	if a.selected >= int(l.rows) {
-		offset = int32(a.selected) - l.rows + 1
-	}
-
+	offset := a.listOffset(l)
 	for i := int32(0); i < l.rows; i++ {
-		idx := int(i + offset)
+		idx := int(i) + offset
 		if idx >= len(a.results) {
 			break
 		}
 
 		y := l.listTop + i*l.rowH
-		selected := idx == a.selected
-		if selected {
+		// Three states, one background each: the keyboard selection, the row a
+		// click would hit, and everything else.
+		background := ColorBackground
+		switch {
+		case idx == a.selected:
+			background = colorSelection
 			c.Fill(win.Rect{Left: 0, Top: y, Right: a.width, Bottom: y + l.rowH}, colorSelection)
 			c.Fill(win.Rect{Left: 0, Top: y, Right: a.scale(3), Bottom: y + l.rowH}, colorAccent)
+		case idx == a.hover:
+			background = colorHover
+			c.Fill(win.Rect{Left: 0, Top: y, Right: a.width, Bottom: y + l.rowH}, colorHover)
 		}
-		a.paintRow(c, a.results[idx], y, l, selected)
+		a.paintRow(c, a.results[idx], y, l, background)
 	}
 
 	if len(a.results) == 0 {
@@ -176,18 +179,13 @@ const (
 )
 
 // paintRow draws one result: icon, then the name with the matched runes in the
-// accent color. y is the top of the row, not of the text.
-func (a *App) paintRow(c *win.Canvas, r core.Result, y int32, l layout, selected bool) {
+// accent color. y is the top of the row, not of the text, and background is the
+// colour the row painted, which icons with alpha need in order to composite.
+func (a *App) paintRow(c *win.Canvas, r core.Result, y int32, l layout, background uint32) {
 	slot := a.scale(iconSlot)
 	fill := a.scale(iconFill)
 	iconGap := a.scale(16)
 
-	// Icons decoded from the shell carry alpha, so they need the colour behind
-	// them in order to composite.
-	background := ColorBackground
-	if selected {
-		background = colorSelection
-	}
 	icon := a.icons.get(r.Entry.IconPath)
 	icon.Draw(c, l.pad+(slot-fill)/2, y+(l.rowH-fill)/2, fill, background)
 

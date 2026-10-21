@@ -44,8 +44,13 @@ type Window struct {
 	onTray       func(msg uint32)
 	onShow       func()
 	onIndexReady func()
+	onMouseMove  func(x, y int32)
+	onMouseLeave func()
+	onClick      func(x, y int32)
+	onWheel      func(delta int32)
 
-	hiding bool
+	hiding        bool
+	trackingLeave bool
 
 	paintStart time.Time
 	paintLat   time.Duration
@@ -127,6 +132,33 @@ func wndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 		case MsgIndexReady:
 			if w.onIndexReady != nil {
 				w.onIndexReady()
+			}
+			return 0
+		case wmMouseMove:
+			// One WM_MOUSELEAVE per entry, or a hover highlight outlives the
+			// pointer and reads as a stuck selection.
+			if !w.trackingLeave {
+				wantLeave(hwnd)
+				w.trackingLeave = true
+			}
+			if w.onMouseMove != nil {
+				w.onMouseMove(loword(lParam), hiword(lParam))
+			}
+			return 0
+		case wmMouseLeave:
+			w.trackingLeave = false
+			if w.onMouseLeave != nil {
+				w.onMouseLeave()
+			}
+			return 0
+		case wmLButtonUp:
+			if w.onClick != nil {
+				w.onClick(loword(lParam), hiword(lParam))
+			}
+			return 0
+		case wmMouseWheel:
+			if w.onWheel != nil {
+				w.onWheel(int32(int16(uint16(wParam >> 16))))
 			}
 			return 0
 		case wmDestroy:
@@ -368,6 +400,18 @@ func (w *Window) OnShow(fn func()) { w.onShow = fn }
 
 // OnIndexReady runs when a background scan reports a fresh index.
 func (w *Window) OnIndexReady(fn func()) { w.onIndexReady = fn }
+
+// OnMouseMove installs the pointer-move handler, in client coordinates.
+func (w *Window) OnMouseMove(fn func(x, y int32)) { w.onMouseMove = fn }
+
+// OnMouseLeave installs the handler for the pointer leaving the client area.
+func (w *Window) OnMouseLeave(fn func()) { w.onMouseLeave = fn }
+
+// OnClick installs the left-button-up handler, in client coordinates.
+func (w *Window) OnClick(fn func(x, y int32)) { w.onClick = fn }
+
+// OnWheel installs the mouse-wheel handler with the raw delta (multiples of 120).
+func (w *Window) OnWheel(fn func(delta int32)) { w.onWheel = fn }
 
 // HWND exposes the native handle for the tray icon and shell calls.
 func (w *Window) HWND() uintptr { return w.hwnd }

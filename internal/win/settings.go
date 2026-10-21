@@ -13,11 +13,35 @@ const settingsClassName = "AppLauncherSettings"
 const (
 	wmSize       = 0x0005
 	wmSysKeyDown = 0x0104
+	wmMouseMove  = 0x0200
 	wmMouseWheel = 0x020A
+	wmMouseLeave = 0x02A3
 
 	csHDraw = 0x0002
 	csVDraw = 0x0001
+
+	tmeLeave = 0x00000002
 )
+
+// trackMouseEvent mirrors TRACKMOUSEEVENT. Asking for one WM_MOUSELEAVE is the
+// only way to know the pointer left, and a hover highlight that outlives the
+// pointer looks like a stuck selection.
+type trackMouseEvent struct {
+	cbSize      uint32
+	dwFlags     uint32
+	hwndTrack   windows.Handle
+	dwHoverTime uint32
+}
+
+// wantLeave arms a single WM_MOUSELEAVE for hwnd.
+func wantLeave(hwnd uintptr) {
+	tme := trackMouseEvent{
+		cbSize:    uint32(unsafe.Sizeof(trackMouseEvent{})),
+		dwFlags:   tmeLeave,
+		hwndTrack: windows.Handle(hwnd),
+	}
+	procTrackMouseEvent.Call(uintptr(unsafe.Pointer(&tme)))
+}
 
 var (
 	settingsWindow *SettingsWindow
@@ -38,8 +62,12 @@ type SettingsWindow struct {
 	onChar  func(rune)
 	onClick func(x, y int32)
 	onWheel func(delta int32)
+	onMove  func(x, y int32)
+	onLeave func()
 	onBlur  func()
 	onClose func()
+
+	trackingLeave bool
 }
 
 func settingsWndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
@@ -98,6 +126,27 @@ func settingsWndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 		if w != nil && w.onClick != nil {
 			w.onClick(loword(lParam), hiword(lParam))
 			return 0
+		}
+
+	case wmMouseMove:
+		if w != nil {
+			if !w.trackingLeave {
+				wantLeave(hwnd)
+				w.trackingLeave = true
+			}
+			if w.onMove != nil {
+				w.onMove(loword(lParam), hiword(lParam))
+				return 0
+			}
+		}
+
+	case wmMouseLeave:
+		if w != nil {
+			w.trackingLeave = false
+			if w.onLeave != nil {
+				w.onLeave()
+				return 0
+			}
 		}
 	}
 	ret, _, _ := procDefWindowProcW.Call(hwnd, msg, wParam, lParam)
@@ -205,6 +254,12 @@ func (w *SettingsWindow) OnClick(fn func(x, y int32)) { w.onClick = fn }
 
 // OnWheel installs the mouse-wheel handler with the raw delta (multiples of 120).
 func (w *SettingsWindow) OnWheel(fn func(delta int32)) { w.onWheel = fn }
+
+// OnMove installs the pointer-move handler, in client coordinates.
+func (w *SettingsWindow) OnMove(fn func(x, y int32)) { w.onMove = fn }
+
+// OnLeave installs the handler for the pointer leaving the client area.
+func (w *SettingsWindow) OnLeave(fn func()) { w.onLeave = fn }
 
 // OnBlur runs when the window loses the foreground.
 func (w *SettingsWindow) OnBlur(fn func()) { w.onBlur = fn }

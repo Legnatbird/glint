@@ -160,6 +160,7 @@ var (
 	procGetDpiForWindow   = user32.NewProc("GetDpiForWindow")
 	procLoadCursorW       = user32.NewProc("LoadCursorW")
 	procGetIconInfo       = user32.NewProc("GetIconInfo")
+	procTrackMouseEvent   = user32.NewProc("TrackMouseEvent")
 
 	procCreateFontW         = gdi32.NewProc("CreateFontW")
 	procGetObjectW          = gdi32.NewProc("GetObjectW")

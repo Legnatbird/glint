@@ -57,11 +57,15 @@ type App struct {
 	// statusFailed decides whether the footer paints the status as an error or
 	// as progress.
 	statusFailed bool
-	rebuild      func()
-	open         func() // opens the settings window
-	indexSeen    *core.Index
-	selfPath     string // the launcher executable, icon source for the settings row
-	timers       map[uintptr]func()
+	// hover is the result under the pointer, -1 when there is none. It is
+	// feedback, not selection: the keyboard selection never moves because the
+	// pointer passed over a row.
+	hover     int
+	rebuild   func()
+	open      func() // opens the settings window
+	indexSeen *core.Index
+	selfPath  string // the launcher executable, icon source for the settings row
+	timers    map[uintptr]func()
 }
 
 // New builds the app around an existing window. index is a getter so the
@@ -77,6 +81,7 @@ func New(w *win.Window, cfg core.Config, index func() *core.Index, history *core
 		history: history,
 		launch:  launch,
 		dpi:     dpi,
+		hover:   -1,
 	}
 }
 
@@ -91,6 +96,10 @@ func (a *App) Attach() {
 	a.window.OnPaint(a.paint)
 	a.window.OnChar(a.onChar)
 	a.window.OnKey(a.onKey)
+	a.window.OnMouseMove(a.mouseMove)
+	a.window.OnMouseLeave(a.mouseLeave)
+	a.window.OnClick(a.mouseClick)
+	a.window.OnWheel(a.mouseWheel)
 	a.window.OnDeactivate(func() {
 		if a.visible {
 			a.Hide()
@@ -141,6 +150,9 @@ func (a *App) Show() {
 	a.query = a.query[:0]
 	a.selected = 0
 	a.status = ""
+	// A highlight from the previous appearance would point at whatever is under
+	// the pointer now, which the next pointer move re-establishes anyway.
+	a.hover = -1
 	a.refresh()
 
 	a.caretOn = true
@@ -163,6 +175,80 @@ func (a *App) Hide() {
 	a.visible = false
 	a.window.KillTimer(timerCaret)
 	a.window.Hide()
+}
+
+// rowAt returns the index of the result under client y, or -1 when the pointer
+// is outside the list.
+func (a *App) rowAt(y int32) int {
+	l := a.computeLayout()
+	if y < l.listTop {
+		return -1
+	}
+	row := int((y - l.listTop) / l.rowH)
+	if row < 0 || row >= int(l.rows) {
+		return -1
+	}
+	idx := row + a.listOffset(l)
+	if idx < 0 || idx >= len(a.results) {
+		return -1
+	}
+	return idx
+}
+
+// listOffset is the first visible result. Painting and hit-testing both call it,
+// so the row the pointer lights up is the row the pointer is actually over.
+func (a *App) listOffset(l layout) int {
+	if a.selected >= int(l.rows) {
+		return a.selected - int(l.rows) + 1
+	}
+	return 0
+}
+
+func (a *App) mouseMove(x, y int32) {
+	row := a.rowAt(y)
+	if row == a.hover {
+		return
+	}
+	a.hover = row
+	a.window.Invalidate()
+}
+
+func (a *App) mouseLeave() {
+	if a.hover == -1 {
+		return
+	}
+	a.hover = -1
+	a.window.Invalidate()
+}
+
+// mouseClick launches the row under the pointer. Hovering never moves the
+// keyboard selection, but a click does: it names the row the user picked, which
+// is what has to stay selected if the launch fails.
+func (a *App) mouseClick(x, y int32) {
+	row := a.rowAt(y)
+	if row < 0 {
+		return
+	}
+	a.selected = row
+	a.activate(win.KeyEvent{})
+}
+
+// mouseWheel walks the selection the way the arrow keys do. The list never holds
+// more rows than fit (max results is eight by default), so scrolling the view
+// would have nothing to scroll.
+func (a *App) mouseWheel(delta int32) {
+	n := len(a.results)
+	if n == 0 || delta == 0 {
+		return
+	}
+	// Positive delta is a wheel turn away from the user, which walks backwards
+	// through the list the way the up arrow does.
+	step := 3
+	if delta > 0 {
+		step = -3
+	}
+	a.selected = ((a.selected+step)%n + n) % n
+	a.window.Invalidate()
 }
 
 // Reload recomputes the list from the current index.
