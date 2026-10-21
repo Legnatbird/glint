@@ -51,7 +51,7 @@ func main() {
 
 	// A second launch must not create a second launcher: it wakes the first one.
 	if !win.AcquireSingleInstance("app-launcher") {
-		win.PostToRunningInstance(win.MsgToggle)
+		win.PostToRunningInstance(win.MsgShow)
 		return
 	}
 
@@ -85,6 +85,9 @@ func run(cfg core.Config, demo string, seconds int, startWithSettings bool) {
 
 	var index atomic.Pointer[core.Index]
 	scanner := &rebuilder{index: &index, cfg: &cfg}
+	// The scan finishes on its own goroutine, so the window has to be told: the
+	// list it painted before the scan is not the list it should be showing.
+	scanner.done = func() { win.PostToWindow(shell.HWND(), win.MsgIndexReady) }
 	scanner.loadCache()
 	scanner.rebuild()
 
@@ -106,6 +109,13 @@ func run(cfg core.Config, demo string, seconds int, startWithSettings bool) {
 	app.Attach()
 	app.SetSize(shell.ClientSize())
 	app.SetRebuildHandler(func() { scanner.rebuild() })
+	// A second invocation of the executable lands here instead of opening a
+	// second window.
+	shell.OnShow(app.Show)
+	shell.OnIndexReady(func() {
+		app.Reload()
+		app.SetStatus("")
+	})
 	if exe, err := os.Executable(); err == nil {
 		app.SetSelfPath(exe)
 	}
@@ -246,6 +256,10 @@ type rebuilder struct {
 
 	mu      sync.Mutex
 	running bool
+
+	// done runs after every scan, on the scan goroutine. It exists so the window
+	// can refresh itself and drop its "rebuilding" status.
+	done func()
 }
 
 // loadCache serves the cached snapshot immediately so the first hotkey never
@@ -277,6 +291,11 @@ func (r *rebuilder) rebuild() {
 			r.mu.Lock()
 			r.running = false
 			r.mu.Unlock()
+			// Even an empty scan has to report back: the window is showing a
+			// status that says it is rebuilding.
+			if r.done != nil {
+				r.done()
+			}
 		}()
 
 		runtime.LockOSThread()

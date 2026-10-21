@@ -140,9 +140,27 @@ func (a *App) paintResults(c *win.Canvas, l layout) {
 		a.paintRow(c, a.results[idx], y, l, selected)
 	}
 
-	if len(a.results) == 0 && len(a.query) > 0 {
-		c.Text("No applications found", l.pad, l.listTop+a.scale(10), colorDim)
+	if len(a.results) == 0 {
+		// "No applications found" and "the index is still being built" are
+		// different situations and deserve different words.
+		message := "No applications found"
+		if a.indexEmpty() {
+			message = "Reading the index…"
+		}
+		c.TextIn(message, win.Rect{
+			Left:   l.pad,
+			Top:    l.listTop + a.scale(14),
+			Right:  a.width - l.pad,
+			Bottom: l.listTop + l.rowH,
+		}, colorDim)
 	}
+}
+
+// indexEmpty reports whether the launcher has nothing to search yet, which is
+// what a cold start or a finished-but-empty scan looks like.
+func (a *App) indexEmpty() bool {
+	idx := a.index()
+	return idx == nil || idx.Len() == 0
 }
 
 // The icon slot, and how much of it a logo may fill.
@@ -212,11 +230,42 @@ func (a *App) paintRow(c *win.Canvas, r core.Result, y int32, l layout, selected
 func (a *App) paintFooter(c *win.Canvas, l layout) {
 	c.UseFont(a.fonts.Footer)
 
-	text := "Enter open  ·  Shift+Enter as admin  ·  Ctrl+Enter folder  ·  Esc close"
-	color := colorDim
+	text, color := a.footerHint(), colorDim
 	if a.status != "" {
-		text = a.status
-		color = colorError
+		text, color = a.status, colorAccent
+		if a.statusFailed {
+			color = colorError
+		}
 	}
-	c.Text(text, l.pad, l.footerY-a.scale(12), color)
+	c.TextIn(text, win.Rect{
+		Left:   l.pad,
+		Top:    l.footerY - a.scale(12),
+		Right:  a.width - l.pad,
+		Bottom: l.footerY,
+	}, color)
+}
+
+// footerHint describes what the selected row can actually do. Listing
+// Shift+Enter on a row that cannot be elevated, or when there are no rows at
+// all, teaches the user to distrust the footer.
+func (a *App) footerHint() string {
+	const close = "Esc close"
+
+	if len(a.results) == 0 {
+		if len(a.query) == 0 {
+			return "Type to search  ·  " + close
+		}
+		return "Esc clears the search  ·  F5 rescans"
+	}
+
+	entry := a.results[a.selected].Entry
+	switch {
+	case entry.Key == settingsKey:
+		return "Enter opens the settings window  ·  " + close
+	case entry.Kind() == core.KindUWP:
+		// A packaged app is activated, not executed: there is no file to reveal.
+		return "Enter open  ·  Shift+Enter as admin  ·  " + close
+	default:
+		return "Enter open  ·  Shift+Enter as admin  ·  Ctrl+Enter folder  ·  " + close
+	}
 }

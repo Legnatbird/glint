@@ -48,17 +48,20 @@ type App struct {
 	width, height int32
 	dpi           int32
 
-	query     []rune
-	results   []core.Result
-	selected  int
-	visible   bool
-	caretOn   bool
-	status    string
-	rebuild   func()
-	open      func() // opens the settings window
-	indexSeen *core.Index
-	selfPath  string // the launcher executable, icon source for the settings row
-	timers    map[uintptr]func()
+	query    []rune
+	results  []core.Result
+	selected int
+	visible  bool
+	caretOn  bool
+	status   string
+	// statusFailed decides whether the footer paints the status as an error or
+	// as progress.
+	statusFailed bool
+	rebuild      func()
+	open         func() // opens the settings window
+	indexSeen    *core.Index
+	selfPath     string // the launcher executable, icon source for the settings row
+	timers       map[uintptr]func()
 }
 
 // New builds the app around an existing window. index is a getter so the
@@ -162,6 +165,20 @@ func (a *App) Hide() {
 	a.window.Hide()
 }
 
+// Reload recomputes the list from the current index.
+//
+// It is the message a finished scan sends. Without it the window keeps the list
+// it built when it was first painted: a cold start would show "Indexing…" until
+// the next keystroke, and a rebuild started from the tray would leave its status
+// on the footer for good.
+func (a *App) Reload() {
+	a.refresh()
+	if a.visible {
+		a.window.Invalidate()
+	}
+}
+
+// refresh rebuilds the result list for the current query.
 func (a *App) refresh() {
 	idx := a.index()
 	if idx == nil {
@@ -298,7 +315,7 @@ func (a *App) onKey(k win.KeyEvent) bool {
 	case win.KeyF5:
 		if a.rebuild != nil {
 			a.rebuild()
-			a.status = "Rebuilding index…"
+			a.SetStatus("Rebuilding index…")
 			a.window.Invalidate()
 		}
 		return true
@@ -318,9 +335,20 @@ func (a *App) SetSettingsHandler(fn func()) { a.open = fn }
 // of its own mark in memory.
 func (a *App) SetSelfPath(path string) { a.selfPath = path }
 
-// SetStatus replaces the footer hint until the next query change.
+// SetStatus puts a neutral notice in the footer until the next query change:
+// progress ("Rebuilding index…") is not a failure and should not be painted like
+// one.
 func (a *App) SetStatus(s string) {
-	a.status = s
+	a.status, a.statusFailed = s, false
+	if a.visible {
+		a.window.Invalidate()
+	}
+}
+
+// SetError reports a failure in the footer and keeps the window open, so the
+// message is not missed.
+func (a *App) SetError(s string) {
+	a.status, a.statusFailed = s, true
 	if a.visible {
 		a.window.Invalidate()
 	}
@@ -351,8 +379,7 @@ func (a *App) activate(k win.KeyEvent) {
 	if a.launch != nil {
 		if err := a.launch(entry, mode); err != nil {
 			// Keep the window open so the failure is visible.
-			a.status = err.Error()
-			a.window.Invalidate()
+			a.SetError(err.Error())
 			return
 		}
 	}

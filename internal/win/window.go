@@ -42,6 +42,8 @@ type Window struct {
 	onKey        func(key KeyEvent) bool
 	onDeactivate func()
 	onTray       func(msg uint32)
+	onShow       func()
+	onIndexReady func()
 
 	hiding bool
 
@@ -114,6 +116,17 @@ func wndProc(hwnd, msg, wParam, lParam uintptr) uintptr {
 		case trayMessage:
 			if w.onTray != nil {
 				w.onTray(uint32(lParam))
+			}
+			return 0
+		case MsgShow:
+			// A second process asked this instance to come up.
+			if w.onShow != nil {
+				w.onShow()
+			}
+			return 0
+		case MsgIndexReady:
+			if w.onIndexReady != nil {
+				w.onIndexReady()
 			}
 			return 0
 		case wmDestroy:
@@ -349,6 +362,12 @@ func (w *Window) OnKey(fn func(KeyEvent) bool) { w.onKey = fn }
 
 // OnTray sets the notification-area callback.
 func (w *Window) OnTray(fn func(msg uint32)) { w.onTray = fn }
+
+// OnShow runs when another process asks this instance to come up.
+func (w *Window) OnShow(fn func()) { w.onShow = fn }
+
+// OnIndexReady runs when a background scan reports a fresh index.
+func (w *Window) OnIndexReady(fn func()) { w.onIndexReady = fn }
 
 // HWND exposes the native handle for the tray icon and shell calls.
 func (w *Window) HWND() uintptr { return w.hwnd }

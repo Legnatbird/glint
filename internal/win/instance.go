@@ -7,10 +7,26 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// MsgToggle is posted to an already running launcher to bring it up.
-const MsgToggle = 0x8001
+// Custom messages, posted to the launcher's own window. Both exist because the
+// things that raise them (a second process, a background scan) cannot touch the
+// UI thread directly.
+const (
+	// MsgShow asks the running instance to come up. It is what a second launch
+	// posts instead of opening a second window.
+	MsgShow = 0x8001
+	// MsgIndexReady reports that a scan swapped in a new index.
+	MsgIndexReady = 0x8002
+)
 
 var procPostMessageW = user32.NewProc("PostMessageW")
+
+// PostToWindow sends msg to hwnd and returns immediately. It is safe from any
+// goroutine: PostMessageW only touches the target thread's queue.
+func PostToWindow(hwnd uintptr, msg uint32) {
+	if hwnd != 0 {
+		procPostMessageW.Call(hwnd, uintptr(msg), 0, 0)
+	}
+}
 
 // instanceMutex is held for the life of the process so the name stays owned.
 var instanceMutex windows.Handle
@@ -51,9 +67,7 @@ func PostToRunningInstance(msg uint32) bool {
 	}
 	ok, _, _ := procPostMessageW.Call(hwnd, uintptr(msg), 0, 0)
 	return ok != 0
-}
-
-// SystemDPI returns the primary monitor's DPI, used to size the window before
+} // SystemDPI returns the primary monitor's DPI, used to size the window before
 // it exists.
 func SystemDPI() uint32 {
 	if dpi, _, _ := procGetDpiForSystem.Call(); dpi != 0 {
