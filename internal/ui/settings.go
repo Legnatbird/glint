@@ -135,6 +135,11 @@ func NewSettings(window *win.SettingsWindow, cfg *core.Config, fonts *win.Fonts,
 	window.OnLeave(s.HandleMouseLeave)
 	window.OnDoubleClick(s.HandleDoubleClick)
 	window.OnBlur(func() {
+		// Leaving the window ends an edit the same way leaving the field does:
+		// the typing is kept. Only Escape throws it away.
+		if s.edit >= 0 {
+			s.finishEdit(true)
+		}
 		if s.capture {
 			s.capture = false
 			if s.hooks.HotkeyLock != nil {
@@ -428,7 +433,7 @@ func (s *Settings) hint(rows []row) string {
 		return "Press the new combination · Esc to cancel"
 	}
 	if s.edit >= 0 {
-		return "Enter saves the name · Esc cancels"
+		return "Enter or a click outside saves · Esc cancels"
 	}
 	if s.armed >= 0 && s.armed < len(rows) {
 		if rows[s.armed].save != nil {
@@ -544,10 +549,14 @@ func (s *Settings) HandleKey(k win.KeyEvent) bool {
 // HandleClick selects the row under the cursor and runs its action. Removable
 // rows only get selected: deleting on a stray click is not worth the risk.
 func (s *Settings) HandleClick(x, y int32) {
-	// While a name is being typed, a click would either throw the typing away or
-	// run another row's action behind the editor. The edit ends on Enter or Esc.
+	// A click outside the editor ends the edit the way a rename ends everywhere:
+	// it saves. A click on the row being edited leaves the typing alone, since
+	// that is still inside the field.
 	if s.edit >= 0 {
-		return
+		if s.rowAtY(y) == s.edit {
+			return
+		}
+		s.finishEdit(true)
 	}
 
 	rows, _ := s.build()
