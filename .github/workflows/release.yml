@@ -67,6 +67,8 @@ jobs:
           New-Item -ItemType Directory dist -Force | Out-Null
           Copy-Item bin/glint.exe dist/
           Copy-Item README.md dist/
+          # A build handed to someone without its license is a build with no terms.
+          Copy-Item LICENSE dist/
           $zip = "glint-$env:VERSION-windows-amd64.zip"
           Compress-Archive -Path dist/* -DestinationPath $zip
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()

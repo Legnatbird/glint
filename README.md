@@ -190,3 +190,13 @@ a 32×32 canvas that may hold a 24×18 mark, and file icons carry whatever paddi
 their `.ico` author chose; fitting the box gives them the same optical weight
 without changing their shape. Artwork that is not square (Terminal and PowerShell
 ship 4:3 tiles) therefore stays 4:3, which is what its package contains.
+
+## License
+
+Personal use only: the source is published so it can be read, not so it can be
+used. You may read it and learn from it; you may not run it for your own purposes,
+reuse any part of it, or distribute a build. See [LICENSE](LICENSE) for the exact
+terms.
+
+This is not an open source license: it restricts the field of use, which the Open
+Source Definition does not allow. The repository is source available.
