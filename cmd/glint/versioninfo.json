@@ -20,11 +20,11 @@
 	},
 	"StringFileInfo": {
 		"Comments": "Keyboard-first application launcher for Windows",
-		"CompanyName": "Glint",
+		"CompanyName": "Legnatbird",
 		"FileDescription": "Glint",
 		"FileVersion": "0.1.0.0",
 		"InternalName": "glint",
-		"LegalCopyright": "",
+		"LegalCopyright": "© Legnatbird",
 		"LegalTrademarks": "",
 		"OriginalFilename": "glint.exe",
 		"PrivateBuild": "",

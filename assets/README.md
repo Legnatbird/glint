@@ -55,6 +55,16 @@ file name when it does not. `versioninfo.json` is therefore part of the identity
 not decoration — changing `ProductName` there changes what the operating system
 calls the program.
 
+The fields are not interchangeable, and Windows labels them in the user's language:
+
+| Field | Spanish Explorer | Value |
+|---|---|---|
+| `ProductName` | Nombre del producto | Glint |
+| `FileDescription` | Descripción | Glint — what the startup list shows |
+| `CompanyName` | **Editor** | Legnatbird — the person, not the program |
+| `LegalCopyright` | Copyright | © Legnatbird |
+| `OriginalFilename` | Nombre original | glint.exe |
+
 ## Sizes
 
 `assets/glint.ico` holds 16, 20, 24, 32, 40, 48, 64 and 256 pixels. The first seven
