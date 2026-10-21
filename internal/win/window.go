@@ -11,7 +11,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-const windowClassName = "AppLauncherShell"
+const windowClassName = "GlintShell"
 
 // WindowConfig describes the shell window.
 //

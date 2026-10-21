@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"applauncher/internal/core"
-	"applauncher/internal/win"
+	"glint/internal/core"
+	"glint/internal/win"
 )
 
 var errTest = errors.New("test failure")

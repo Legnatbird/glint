@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"applauncher/internal/core"
+	"glint/internal/core"
 )
 
 // scanPath walks the PATH directories.

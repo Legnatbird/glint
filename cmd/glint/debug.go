@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// debugLog writes to launcher-debug.log next to the executable when
+// debugLog writes to glint-debug.log next to the executable when
 // LAUNCHER_DEBUG is set.
 //
 // The process is a GUI-subsystem app: stderr goes nowhere, so a failure to
@@ -20,7 +20,7 @@ func debugf(format string, args ...any) {
 		return
 	}
 	if debugLog == nil {
-		path := filepath.Join(exeDir(), "launcher-debug.log")
+		path := filepath.Join(exeDir(), "glint-debug.log")
 		file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 		if err != nil {
 			return

@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"applauncher/internal/core"
-	"applauncher/internal/win"
+	"glint/internal/core"
+	"glint/internal/win"
 )
 
 // Settings is the form that lives inside the settings window.

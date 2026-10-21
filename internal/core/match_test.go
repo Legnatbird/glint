@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"applauncher/internal/core"
+	"glint/internal/core"
 )
 
 // The scorer's job is to rank, not to produce a beautiful number. These cases

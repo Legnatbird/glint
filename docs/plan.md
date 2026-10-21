@@ -1,9 +1,9 @@
-# app-launcher — product and engineering plan
+# Glint — product and engineering plan
 
 Status: **P3 complete** · Updated: 2026-10-20
 
 A Windows-only, keyboard-first launcher that finds and starts applications. It is
-the app-launcher slice of [Wox](https://github.com/Wox-launcher/Wox) rebuilt around
+the launcher slice of [Wox](https://github.com/Wox-launcher/Wox) rebuilt around
 one constraint: it must cost almost nothing while idle.
 
 Wox v2 ships a Go core, a Flutter UI and plugin/cloud/AI/telemetry subsystems, and
@@ -14,7 +14,7 @@ declares ~150 MB resident. This project keeps the one verb people repeat all day
 
 1. `go run ./cmd/spike` — prints the measured baseline (P0 evidence, ~6 s).
 2. `go test ./...` — matching, ranking and config rules.
-3. `go build -trimpath -ldflags "-s -w" -o bin/launcher.exe ./cmd/launcher` — P2.
+3. `go build -trimpath -ldflags "-s -w" -o bin/glint.exe ./cmd/glint` — P2.
 
 ## Decisions
 
@@ -151,7 +151,7 @@ P2 acceptance criterion, not a nice-to-have.
 ## Architecture
 
 ```
-cmd/launcher        composition root; flags, single-instance, tray
+cmd/glint        composition root; flags, single-instance, tray
 cmd/spike           P0 measurement harness (kept: it is the regression baseline)
 internal/win        the only package allowed to call Win32
 internal/core       models, matcher, ranker, config, index cache   ← no Win32, 100% testable
@@ -232,12 +232,13 @@ Rules it has to respect:
 | Icon extraction cost | Slow first paint, handle growth | Lazy per-visible-row icons, LRU cap 128, each cached icon 4 KB of decoded pixels instead of a live HICON; GDI handle budget asserted in tests |
 | Windows 10 has no Mica | Square, flat window vs Win11 | The window stays opaque and rounds through a region; a translucent backdrop was removed because the accent is not clipped by the region and left dark corners |
 | Antivirus/SmartScreen on unsigned exe | Distribution friction | Out of scope: portable, personal use |
+| Renaming the product | A second copy starting at login from the old `Run` value, pointing at a binary that no longer exists | `SetAutostart` deletes the legacy `app-launcher` value on every call, so the first launch after the rename migrates the entry |
 
 ## Open decisions (defaults already chosen; say the word to change any)
 
 | Topic | Default taken |
 |---|---|
-| Product name | Working name `app-launcher`, binary `launcher.exe` |
+| Product name | Product name `Glint`, binary `glint.exe` |
 | Default hotkey | `Ctrl+Alt+Space` |
 | UI language | English |
 | Empty-query behavior | Top 8 by frecency |

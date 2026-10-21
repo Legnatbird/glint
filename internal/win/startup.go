@@ -10,7 +10,11 @@ import (
 
 const (
 	runKey       = `Software\Microsoft\Windows\CurrentVersion\Run`
-	runValueName = "app-launcher"
+	runValueName = "Glint"
+	// legacyRunValueName is what the launcher wrote before the rename. Leaving it
+	// behind would start a second copy at login, pointing at a binary that no
+	// longer exists.
+	legacyRunValueName = "app-launcher"
 )
 
 // SetAutostart adds or removes the launcher from the per-user Run key.
@@ -23,6 +27,12 @@ func SetAutostart(enabled bool) error {
 		return err
 	}
 	defer key.Close()
+
+	// The entry under the old name is dropped whether autostart is being turned
+	// on or off: it is a leftover from before the rename.
+	if err := key.DeleteValue(legacyRunValueName); err != nil && !errors.Is(err, registry.ErrNotExist) {
+		return err
+	}
 
 	if !enabled {
 		err := key.DeleteValue(runValueName)

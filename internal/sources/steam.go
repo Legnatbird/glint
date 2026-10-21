@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/sys/windows/registry"
 
-	"applauncher/internal/core"
+	"glint/internal/core"
 )
 
 // Steam libraries.

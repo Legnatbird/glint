@@ -6,8 +6,8 @@ import (
 	"strings"
 	"unicode"
 
-	"applauncher/internal/core"
-	"applauncher/internal/win"
+	"glint/internal/core"
+	"glint/internal/win"
 )
 
 // startMenuRoots returns the machine-wide and per-user Start Menu programs

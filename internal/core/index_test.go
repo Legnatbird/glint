@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"applauncher/internal/core"
+	"glint/internal/core"
 )
 
 func testEntries() []core.Entry {

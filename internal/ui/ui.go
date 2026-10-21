@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"applauncher/internal/core"
-	"applauncher/internal/win"
+	"glint/internal/core"
+	"glint/internal/win"
 )
 
 // settingsKey marks the synthetic row that opens the settings window. It never

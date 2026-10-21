@@ -1,6 +1,6 @@
 package ui
 
-import "applauncher/internal/win"
+import "glint/internal/win"
 
 // iconCache keeps the HICONs of the rows the user has actually seen.
 //

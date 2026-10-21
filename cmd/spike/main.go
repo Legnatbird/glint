@@ -13,7 +13,7 @@ import (
 	"runtime"
 	"time"
 
-	"applauncher/internal/win"
+	"glint/internal/win"
 )
 
 type report struct {
@@ -58,7 +58,7 @@ func main() {
 
 	bootStart := time.Now()
 	shell, err := win.NewWindow(win.WindowConfig{
-		Title:      "app-launcher spike",
+		Title:      "glint spike",
 		Width:      640,
 		Height:     420,
 		Background: 0x1B1818,

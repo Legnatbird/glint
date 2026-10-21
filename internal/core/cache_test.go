@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"applauncher/internal/core"
+	"glint/internal/core"
 )
 
 func writeFile(path, body string) error {

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"applauncher/internal/core"
+	"glint/internal/core"
 )
 
 func TestDefaultConfig(t *testing.T) {

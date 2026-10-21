@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"applauncher/internal/core"
+	"glint/internal/core"
 )
 
 func TestFrecencyDecay(t *testing.T) {

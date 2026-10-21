@@ -8,7 +8,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-const settingsClassName = "AppLauncherSettings"
+const settingsClassName = "GlintSettings"
 
 const (
 	wmSize        = 0x0005

@@ -3,7 +3,7 @@ package sources
 import (
 	"strings"
 
-	"applauncher/internal/core"
+	"glint/internal/core"
 )
 
 // scanManual turns the hand-written entries of config.json into applications.

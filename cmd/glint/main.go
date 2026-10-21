@@ -13,14 +13,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"applauncher/internal/core"
-	"applauncher/internal/sources"
-	"applauncher/internal/ui"
-	"applauncher/internal/win"
+	"glint/internal/core"
+	"glint/internal/sources"
+	"glint/internal/ui"
+	"glint/internal/win"
 )
 
 func main() {
-	// A console-subsystem build (plain `go build ./cmd/launcher`) would keep a
+	// A console-subsystem build (plain `go build ./cmd/glint`) would keep a
 	// black window alive for the whole life of the launcher. Detach before
 	// anything else; -dump needs the console and is exempt.
 	if !wantsDump(os.Args[1:]) {
@@ -50,7 +50,7 @@ func main() {
 	}
 
 	// A second launch must not create a second launcher: it wakes the first one.
-	if !win.AcquireSingleInstance("app-launcher") {
+	if !win.AcquireSingleInstance("glint") {
 		win.PostToRunningInstance(win.MsgShow)
 		return
 	}
@@ -62,7 +62,7 @@ func run(cfg core.Config, demo string, seconds int, startWithSettings bool) {
 	dpi := int32(win.SystemDPI())
 
 	shell, err := win.NewWindow(win.WindowConfig{
-		Title: "Launcher",
+		Title: "Glint",
 		Width: 700 * dpi / 96,
 		// 540 keeps the nine rows the 44px layout used to show now that a row is
 		// 50px tall: (footer - gap - listTop) / rowH has to stay above nine.
@@ -175,7 +175,7 @@ func run(cfg core.Config, demo string, seconds int, startWithSettings bool) {
 	})
 	shell.OnClose(shell.PostQuit)
 
-	tray, err := win.NewTray(shell.HWND(), "app-launcher")
+	tray, err := win.NewTray(shell.HWND(), "Glint")
 	if err != nil {
 		debugf("tray error: %v", err)
 	} else {

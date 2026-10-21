@@ -5,7 +5,7 @@ import (
 
 	"golang.org/x/sys/windows/registry"
 
-	"applauncher/internal/core"
+	"glint/internal/core"
 )
 
 // appPathsKey is where Windows keeps the "type chrome and it runs" mapping.

@@ -17,10 +17,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"applauncher/internal/art"
+	"glint/internal/art"
 )
 
-//go:generate go run . -out ../../assets/launcher.ico
+//go:generate go run . -out ../../assets/glint.ico
 
 // Sizes Windows actually asks for. 256 is stored as PNG because a raw bitmap at
 // that size would add a quarter of a megabyte to the binary.
@@ -29,7 +29,7 @@ var sizes = []int{16, 20, 24, 32, 40, 48, 64, 256}
 const pngSize = 256
 
 func main() {
-	out := flag.String("out", "launcher.ico", "path of the .ico to write")
+	out := flag.String("out", "glint.ico", "path of the .ico to write")
 	flag.Parse()
 
 	data, err := buildIcon()

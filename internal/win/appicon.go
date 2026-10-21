@@ -3,7 +3,7 @@ package win
 import (
 	"unsafe"
 
-	"applauncher/internal/art"
+	"glint/internal/art"
 
 	"golang.org/x/sys/windows"
 )

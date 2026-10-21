@@ -1,4 +1,4 @@
-module applauncher
+module glint
 
 go 1.27
 

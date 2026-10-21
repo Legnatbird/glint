@@ -1,8 +1,8 @@
 package ui
 
 import (
-	"applauncher/internal/core"
-	"applauncher/internal/win"
+	"glint/internal/core"
+	"glint/internal/win"
 )
 
 // Palette, in 0x00BBGGRR order (the byte order GDI expects).

@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"applauncher/internal/core"
-	"applauncher/internal/win"
+	"glint/internal/core"
+	"glint/internal/win"
 )
 
 // Options selects which sources to scan and what to leave out.

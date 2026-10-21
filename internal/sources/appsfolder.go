@@ -3,8 +3,8 @@ package sources
 import (
 	"strings"
 
-	"applauncher/internal/core"
-	"applauncher/internal/win"
+	"glint/internal/core"
+	"glint/internal/win"
 )
 
 // scanAppsFolder returns Store, MSIX and other packaged applications.

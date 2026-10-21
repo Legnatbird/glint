@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"applauncher/internal/core"
+	"glint/internal/core"
 )
 
 // scanCustomFolders walks the user-configured portable folders for executables

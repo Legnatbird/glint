@@ -1,6 +1,6 @@
-# app-launcher
+# Glint
 
-A Windows-only, keyboard-first launcher for applications — the app-launcher slice
+A Windows-only, keyboard-first launcher for applications — the launcher slice
 of Wox, rebuilt to stay under 30 MB and answer every keystroke in about a
 millisecond.
 
@@ -33,7 +33,7 @@ executable. `-s -w` drops the symbol table: the binary is ~3 MB.
 
 ## Run
 
-Start `bin/launcher.exe`. It registers `Ctrl+Alt+Space`, stays in the background
+Start `bin/glint.exe`. It registers `Ctrl+Alt+Space`, stays in the background
 and shows the launcher on demand.
 
 | Key | Action |
@@ -133,7 +133,7 @@ rounded clip looks better than translucent with broken corners.
 ## Inspect what it found
 
 ```powershell
-./bin/launcher.exe -dump | more
+./bin/glint.exe -dump | more
 ```
 
 `-demo <query> -seconds <n>` opens the launcher with a query already typed, which
@@ -150,14 +150,14 @@ go run ./cmd/spike
 ## Layout
 
 ```
-cmd/launcher      the app: window, hotkey, wiring; rsrc.syso carries the icon
+cmd/glint      the app: window, hotkey, wiring; rsrc.syso carries the icon
 cmd/spike         P0 measurement harness
 internal/art      the launcher's mark, rasterized in pure Go
 internal/win      the only package allowed to call Win32 (COM, GDI, shell)
 internal/sources  Start Menu, Store/UWP, App Paths and PATH scanners
 internal/core     matching, ranking, config, cache (no Win32)
 internal/ui       launcher state machine and painting
-tools/icongen     renders assets/launcher.ico from internal/art
+tools/icongen     renders assets/glint.ico from internal/art
 docs/plan.md      product and engineering plan
 ```
 
