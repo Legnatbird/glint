@@ -16,6 +16,24 @@ declares ~150 MB resident. This project keeps the one verb people repeat all day
 2. `go test ./...`, matching, ranking and config rules.
 3. `go build -trimpath -ldflags "-s -w" -o bin/glint.exe ./cmd/glint`, P2.
 
+## Releases
+
+Two workflows, both on `windows-latest`: `ci.yml` runs gofmt, `go vet`, the tests
+and a build on every push and pull request, then reads the executable's version
+block back to prove the resources survived the link. `release.yml` fires on a `v*`
+tag, builds, and publishes a zip with the executable and the README plus a
+`SHA256SUMS.txt`.
+
+The version lives in `cmd/glint/versioninfo.json`, so the ritual is:
+
+1. Bump `FileVersion` and `ProductVersion` there (both the numbers and the
+   strings), regenerate `resource.syso` (see [assets/README.md](../assets/README.md)),
+   commit.
+2. `git tag v0.1.0 && git push origin v0.1.0`.
+3. The workflow refuses to publish if the tag and the binary disagree, which is the
+   only failure mode worth guarding: a release that reports the wrong version is
+   worse than a missing one.
+
 ## Decisions
 
 | Area | Decision | Why |

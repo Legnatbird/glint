@@ -1,10 +1,13 @@
 # Glint
 
+[![CI](https://github.com/Legnatbird/glint/actions/workflows/ci.yml/badge.svg)](https://github.com/Legnatbird/glint/actions/workflows/ci.yml)
+
 A Windows-only, keyboard-first launcher for applications: the launcher slice
 of Wox, rebuilt to stay under 30 MB and answer every keystroke in about a
 millisecond.
 
-Plan and living decisions: [docs/plan.md](docs/plan.md).
+Plan and living decisions: [docs/plan.md](docs/plan.md). Releases carry the built
+executable: [github.com/Legnatbird/glint/releases](https://github.com/Legnatbird/glint/releases).
 
 ## Status
 

@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: format, vet, test, build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        shell: pwsh
+        run: |
+          $dirty = gofmt -l .
+          if ($dirty) {
+            Write-Host "::error::these files need gofmt:"
+            $dirty | ForEach-Object { Write-Host "  $_" }
+            exit 1
+          }
+
+      - name: vet
+        run: go vet ./...
+
+      # -count=1 so a cached result can never hide a failure.
+      - name: test
+        run: go test ./... -count=1
+
+      - name: build
+        shell: pwsh
+        run: ./build.ps1
+
+      - name: the executable carries its identity
+        shell: pwsh
+        run: |
+          $info = [System.Diagnostics.FileVersionInfo]::GetVersionInfo("bin/glint.exe")
+          Write-Host "ProductName:     $($info.ProductName)"
+          Write-Host "FileDescription: $($info.FileDescription)"
+          Write-Host "CompanyName:     $($info.CompanyName)"
+          Write-Host "FileVersion:     $($info.FileVersion)"
+          if ($info.ProductName -ne "Glint") { Write-Host "::error::the product name is missing from the resources"; exit 1 }
+          if ($info.CompanyName -ne "Legnatbird") { Write-Host "::error::the publisher is missing from the resources"; exit 1 }

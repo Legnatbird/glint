@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: package and publish
+    runs-on: windows-latest
+    steps:
+      # On a tag push this is the tag; on a manual run it is the tag typed in, so
+      # the release is always built from the tree that carries the version.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: resolve the version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag }}"
+          if (-not $tag) { $tag = "${{ github.ref_name }}" }
+          if (-not $tag.StartsWith("v")) {
+            Write-Host "::error::the tag must look like v0.1.0, got '$tag'"
+            exit 1
+          }
+          $version = $tag.TrimStart("v")
+          "TAG=$tag" >> $env:GITHUB_ENV
+          "VERSION=$version" >> $env:GITHUB_ENV
+          Write-Host "releasing $tag"
+
+      - name: build
+        shell: pwsh
+        run: ./build.ps1
+
+      # The version lives in cmd/glint/versioninfo.json, not in the tag, so a
+      # forgotten bump would publish a binary that lies about itself.
+      - name: the binary reports the released version
+        shell: pwsh
+        run: |
+          $parts = $env:VERSION.Split(".")
+          while ($parts.Count -lt 4) { $parts += "0" }
+          $expected = ($parts[0..3] -join ".")
+          $info = [System.Diagnostics.FileVersionInfo]::GetVersionInfo("bin/glint.exe")
+          Write-Host "tag $env:TAG expects FileVersion $expected, binary says $($info.FileVersion)"
+          if ($info.FileVersion -ne $expected) {
+            Write-Host "::error::bump cmd/glint/versioninfo.json to $expected before tagging"
+            exit 1
+          }
+
+      - name: package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist -Force | Out-Null
+          Copy-Item bin/glint.exe dist/
+          Copy-Item README.md dist/
+          $zip = "glint-$env:VERSION-windows-amd64.zip"
+          Compress-Archive -Path dist/* -DestinationPath $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Set-Content SHA256SUMS.txt
+          "ZIP=$zip" >> $env:GITHUB_ENV
+          Get-Content SHA256SUMS.txt
+
+      - name: publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create $env:TAG "$env:ZIP" SHA256SUMS.txt --title "Glint $env:VERSION" --generate-notes
