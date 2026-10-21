@@ -46,6 +46,17 @@ and shows the launcher on demand.
 | `Esc` | Clear the query, then hide |
 | `F5` | Rebuild the index |
 
+The query is a real text field, so the editing keys are the ones on the rest of the
+machine:
+
+| Key | Action |
+|---|---|
+| `←` `→` `Home` `End` | Move the caret |
+| `Shift`+movement | Select |
+| `Ctrl+←` `Ctrl+→` | Move by word |
+| `Ctrl+A` | Select all — then type to replace, or `Backspace` to clear |
+| `Ctrl+Backspace` `Ctrl+Delete` | Delete a word |
+
 The pointer works too: hovering shows which row a click would hit, clicking
 launches it, and the wheel moves the selection three rows at a time. Hover is only
 feedback — it never moves the keyboard selection, so reaching for the mouse cannot
@@ -65,7 +76,11 @@ One column of rows, keyboard first; the pointer hovers and clicks the same rows:
 | `↑` `↓` `Tab` | Move between rows |
 | `←` `→` | Change a value (`max_results`, PATH scope) |
 | `Enter` `Space` | Activate: record a hotkey, toggle, pick a folder, clear |
+| `Enter` on a manual app | Rename it — `Ctrl+A`, arrows and `Backspace` work while typing |
+| `Delete` on a manual app or folder | Remove it (asks twice) |
 | `Esc` | Close |
+
+Rows that hold a value also carry `−` and `+` buttons after it, for the mouse.
 
 Every edit is saved to `config.json` and pushed to the running launcher at once:
 

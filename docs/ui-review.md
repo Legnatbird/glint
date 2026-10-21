@@ -35,6 +35,10 @@ controls, so the review is a review of painting code, hit-testing and key handli
 |---|---|---|---|
 | 10 | The launcher ignores the mouse completely: no hover, no click, no wheel. The settings window has click and wheel, so the two surfaces disagree. | A launcher that only answers the keyboard is a launcher nobody discovers; hovering is the cheapest way to show a row is clickable. | fixed |
 | 11 | Settings rows highlight only on keyboard selection; the pointer gives no feedback at all. | Same reason, and it is the "hover" the request names. | fixed |
+| 12 | The query was an append/backspace rune list: no caret, no selection, and Escape was the only way to clear it. | Every other text box on the machine answers Ctrl+A, arrows and Home/End; a search box that does not is the one place the user has to relearn typing. | fixed |
+| 13 | Value rows (`max_results`, PATH scope) changed only with ←/→, and nothing on screen said so. | An affordance the user cannot see is not an affordance. | fixed |
+| 14 | A manual app's name was its file name, with no way to change it; removal and activation shared `Enter`. | The name is what the list shows, so it has to be editable there. | fixed |
+| 15 | Copy and paste in the query field. | Reading and writing the Win32 clipboard needs an HGLOBAL-to-Go byte copy; the vet-clean workarounds (self `ReadProcessMemory`/`WriteProcessMemory`) buy a feature with a hack. | deferred, with the reason |
 
 ### Checked and left alone
 
