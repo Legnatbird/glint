@@ -86,8 +86,10 @@ type row struct {
 }
 
 // SettingsTitle names the settings window in both places it appears: the title
-// bar and the heading inside the window. One string, so they cannot drift.
-const SettingsTitle = "app-launcher Settings"
+// bar and the heading inside the window. One string, so they cannot drift. No app
+// prefix: the window is opened from the launcher, and the title bar already shows
+// the launcher's own icon.
+const SettingsTitle = "Settings"
 
 // Layout, in points at 96 dpi; everything is scaled by the window DPI.
 const (
