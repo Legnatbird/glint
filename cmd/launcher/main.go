@@ -137,7 +137,7 @@ func run(cfg core.Config, demo string, seconds int, startWithSettings bool) {
 	var settings *win.SettingsWindow
 	showSettings := func() {
 		if settings == nil {
-			w, err := win.NewSettingsWindow("app-launcher settings", 600*dpi/96, 640*dpi/96)
+			w, err := win.NewSettingsWindow(ui.SettingsTitle, 600*dpi/96, 640*dpi/96)
 			if err != nil {
 				debugf("settings window failed: %v", err)
 				return

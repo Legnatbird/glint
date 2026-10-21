@@ -85,6 +85,10 @@ type row struct {
 	save func(text string)
 }
 
+// SettingsTitle names the settings window in both places it appears: the title
+// bar and the heading inside the window. One string, so they cannot drift.
+const SettingsTitle = "app-launcher Settings"
+
 // Layout, in points at 96 dpi; everything is scaled by the window DPI.
 const (
 	setPad        = 26
@@ -235,7 +239,7 @@ func (s *Settings) Paint(c *win.Canvas) {
 
 	pad := s.scale(setPad)
 	c.UseFont(s.fonts.Query)
-	c.Text("Settings", pad, s.scale(setTitleY), colorText)
+	c.Text(SettingsTitle, pad, s.scale(setTitleY), colorText)
 
 	rows, contentH := s.build()
 	s.clampSelection(rows, contentH)
