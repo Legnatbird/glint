@@ -25,13 +25,16 @@ controls, so the review is a review of painting code, hit-testing and key handli
 | 4 | The launcher footer always lists "Enter · Shift+Enter · Ctrl+Enter · Esc", including when there are no results or the selection is the Settings row, where three of the four do nothing. | `state-3-noresults`, `state-4-settings-row` | fixed |
 | 5 | "No applications found" says what happened but not what to do, and it reads the same while the first scan is still running. | `state-3-noresults` | fixed |
 | 6 | The caret does not restart its blink on a keystroke, so it can be invisible exactly when the user starts typing. | `onChar` never touches `caretOn` | fixed |
+| 7 | A second launch of the executable does nothing: it posts `WM_APP+1` and the message loop has no case for it. | measured: hidden before the second launch, hidden after | fixed |
+| 8 | A finished scan never reaches the window, so a cold start stays on "Reading the index…" until the next keystroke and a rebuild leaves "Rebuilding index…" in the footer for good. | F5 leaves the status up; `rebuild` had no completion hook | fixed |
+| 9 | Progress is painted in the error colour: the footer treated every status as a failure. | "Rebuilding index…" in red | fixed |
 
 ### Gaps
 
 | # | What | Why it matters | Status |
 |---|---|---|---|
-| 7 | The launcher ignores the mouse completely: no hover, no click, no wheel. The settings window has click and wheel, so the two surfaces disagree. | A launcher that only answers the keyboard is a launcher nobody discovers; hovering is the cheapest way to show a row is clickable. | fixed |
-| 8 | Settings rows highlight only on keyboard selection; the pointer gives no feedback at all. | Same reason, and it is the "hover" the request names. | fixed |
+| 10 | The launcher ignores the mouse completely: no hover, no click, no wheel. The settings window has click and wheel, so the two surfaces disagree. | A launcher that only answers the keyboard is a launcher nobody discovers; hovering is the cheapest way to show a row is clickable. | fixed |
+| 11 | Settings rows highlight only on keyboard selection; the pointer gives no feedback at all. | Same reason, and it is the "hover" the request names. | fixed |
 
 ### Checked and left alone
 
@@ -52,3 +55,5 @@ controls, so the review is a review of painting code, hit-testing and key handli
   that would do nothing.
 - Hover is feedback, not selection: the keyboard selection stays where it is, the pointer
   only shows which row a click would hit.
+- Anything that happens off the message thread — a second process, a finished scan —
+  reaches the window as a posted message, never by touching UI state directly.

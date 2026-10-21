@@ -46,14 +46,19 @@ and shows the launcher on demand.
 | `Esc` | Clear the query, then hide |
 | `F5` | Rebuild the index |
 
+The pointer works too: hovering shows which row a click would hit, clicking
+launches it, and the wheel moves the selection three rows at a time. Hover is only
+feedback — it never moves the keyboard selection, so reaching for the mouse cannot
+change what `Enter` will do.
+
 Typing `set` (or `con`, `aju`, `pref`) puts a **Settings** row on top of the list;
 so does the tray menu. Both open the settings window.
 
-Starting it again toggles the running instance instead of creating a second one.
+Starting it again shows the running instance instead of creating a second one.
 
 ## Settings window
 
-One column of rows, keyboard first:
+One column of rows, keyboard first; the pointer hovers and clicks the same rows:
 
 | Key | Action |
 |---|---|
