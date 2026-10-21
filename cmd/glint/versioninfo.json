@@ -3,13 +3,13 @@
 		"FileVersion": {
 			"Major": 0,
 			"Minor": 1,
-			"Patch": 0,
+			"Patch": 1,
 			"Build": 0
 		},
 		"ProductVersion": {
 			"Major": 0,
 			"Minor": 1,
-			"Patch": 0,
+			"Patch": 1,
 			"Build": 0
 		},
 		"FileFlagsMask": "3f",
@@ -22,14 +22,14 @@
 		"Comments": "Keyboard-first application launcher for Windows",
 		"CompanyName": "Legnatbird",
 		"FileDescription": "Glint",
-		"FileVersion": "0.1.0.0",
+		"FileVersion": "0.1.1.0",
 		"InternalName": "glint",
 		"LegalCopyright": "© Legnatbird",
 		"LegalTrademarks": "",
 		"OriginalFilename": "glint.exe",
 		"PrivateBuild": "",
 		"ProductName": "Glint",
-		"ProductVersion": "0.1.0.0",
+		"ProductVersion": "0.1.1.0",
 		"SpecialBuild": ""
 	},
 	"VarFileInfo": {

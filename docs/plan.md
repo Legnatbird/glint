@@ -249,7 +249,7 @@ Rules it has to respect:
 | Some UWP entries lack a launchable AUMID | Dead result rows | Validate at index time; drop entries that fail activation |
 | Icon extraction cost | Slow first paint, handle growth | Lazy per-visible-row icons, LRU cap 128, each cached icon 4 KB of decoded pixels instead of a live HICON; GDI handle budget asserted in tests |
 | Windows 10 has no Mica | Square, flat window vs Win11 | The window stays opaque and rounds through a region; a translucent backdrop was removed because the accent is not clipped by the region and left dark corners |
-| Antivirus/SmartScreen on unsigned exe | Distribution friction | Out of scope: portable, personal use |
+| Antivirus/SmartScreen on unsigned exe | Distribution friction | Out of scope: the project ships a portable zip, not a signed installer |
 | Renaming the product | A second copy starting at login from the old `Run` value, pointing at a binary that no longer exists | `SetAutostart` deletes the legacy `app-launcher` value on every call, so the first launch after the rename migrates the entry |
 
 ## Open decisions (defaults already chosen; say the word to change any)

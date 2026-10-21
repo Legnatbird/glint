@@ -193,10 +193,6 @@ ship 4:3 tiles) therefore stays 4:3, which is what its package contains.
 
 ## License
 
-Personal use only: the source is published so it can be read, not so it can be
-used. You may read it and learn from it; you may not run it for your own purposes,
-reuse any part of it, or distribute a build. See [LICENSE](LICENSE) for the exact
-terms.
-
-This is not an open source license: it restricts the field of use, which the Open
-Source Definition does not allow. The repository is source available.
+MIT. Use it, change it, ship it, sell it: keep the copyright notice and the
+permission notice with any copy or substantial part, and understand that it comes
+with no warranty. See [LICENSE](LICENSE) for the exact terms.
